@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>gemini-web2api 管理面板</title>
+<title>gemini-web2api Admin Panel</title>
 <!-- Chart.js 随二进制一起 embed，不走 CDN：内网/离线部署也要能开面板 -->
 <script src="chart.umd.min.js"></script>
 <style>
@@ -418,7 +418,7 @@ const api = async (path, opts = {}) => {
 };
 
 const fmt = {
-  ts: (sec) => new Date(sec * 1000).toLocaleString('zh-CN', { hour12: false }),
+  ts: (sec) => new Date(sec * 1000).toLocaleString(LANG === 'zh' ? 'zh-CN' : 'en-GB', { hour12: false }),
   ms: (ms) => ms == null ? '-' : (ms < 1000 ? ms + 'ms' : (ms/1000).toFixed(2) + 's'),
   num: (n) => (n || 0).toLocaleString(),
   pct: (n) => (n * 100).toFixed(1) + '%',
@@ -783,7 +783,7 @@ const pages = {
   -H "Authorization: Bearer YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"gemini-3.6-flash",
-       "messages":[{"role":"user","content":"你好"}]}'</pre>
+       "messages":[{"role":"user","content":"Hello"}]}'</pre>
               </div>
             </details>
           </div>
@@ -2636,7 +2636,7 @@ const I18N_PATTERNS = [
   [/^另有\s*(\d+)\s*项未在上面列出（(.*?)），会一并保留。$/, '$1 additional items not listed above ($2) will be kept.'],
 ];
 
-let LANG = (() => { try { return localStorage.getItem('lang') === 'en' ? 'en' : 'zh'; } catch (e) { return 'zh'; } })();
+let LANG = (() => { try { return localStorage.getItem('lang') === 'zh' ? 'zh' : 'en'; } catch (e) { return 'en'; } })();
 const ZH_ORIG = new WeakMap();
 const I18N_ATTRS = ['title', 'placeholder', 'aria-label'];
 
