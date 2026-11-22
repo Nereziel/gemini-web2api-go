@@ -254,7 +254,7 @@ func formatToolResult(name, raw string) string {
 	}
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return fmt.Sprintf("[%s]: ✅ 完成，无输出（正常，动作已生效，不要重复执行）。", label)
+		return fmt.Sprintf("[%s]: Completed with no output (normal; action already applied, do not run again).", label)
 	}
 	// Codex 风格包装：末尾 "Output:" 后是真正的 stdout。
 	out := trimmed
@@ -264,11 +264,11 @@ func formatToolResult(name, raw string) string {
 	if m := exitCodeRe.FindStringSubmatch(trimmed); m != nil {
 		if m[1] == "0" {
 			if out == "" {
-				return fmt.Sprintf("[%s]: ✅ 命令成功（exit 0），无文本输出——这对写文件/设值类命令是正常的，动作已完成，不要再跑同一条命令。", label)
+				return fmt.Sprintf("[%s]: Command succeeded (exit 0), no text output. This is normal for writing files or changing settings; do not repeat the command.", label)
 			}
-			return fmt.Sprintf("[%s]: ✅ 命令成功（exit 0）。输出：\n%s", label, out)
+			return fmt.Sprintf("[%s]: Command succeeded (exit 0). Output:\n%s", label, out)
 		}
-		return fmt.Sprintf("[%s]: ❌ 命令失败（exit %s）。输出：\n%s", label, m[1], out)
+		return fmt.Sprintf("[%s]: Command failed (exit %s). Output:\n%s", label, m[1], out)
 	}
 	return fmt.Sprintf("[%s]: %s", label, raw)
 }
