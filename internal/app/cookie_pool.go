@@ -106,7 +106,7 @@ func warnMissingOSID(label, cookie string) {
 	if hasCookieName(cookie, "OSID") {
 		return
 	}
-	logf("[cookie] %s 里没有 OSID，gemini.google.com 会跳去登录页；请在 gemini.google.com 页面重新导出", label)
+	logf("[cookie] %s is missing OSID; gemini.google.com may redirect to login. Re-export cookies from gemini.google.com", label)
 }
 
 // accountAdd 往池里插一条。cookie 必须能取到非空的 SAPISID。
@@ -116,12 +116,12 @@ func warnMissingOSID(label, cookie string) {
 // 一份没填的逐项模板（键名在、值全空）放进池子，存成一整段 JSON，
 // 之后每次轮到它都注定失败。
 func accountAdd(label, cookie, note string) (int64, error) {
-	c, ok := normalizeCookie(cookie, "手工添加的 cookie")
+	c, ok := normalizeCookie(cookie, "Manually added cookie")
 	if !ok {
-		return 0, fmt.Errorf("cookie 解析失败：既不是 \"k=v; k=v\" 串，也不是可识别的 JSON")
+		return 0, fmt.Errorf("cannot parse cookie: expected a \"k=v; k=v\" string or recognized JSON")
 	}
 	if extractSAPISID(c) == "" {
-		return 0, fmt.Errorf("cookie 里没有 SAPISID，多半没复制全（需要 gemini.google.com 下的完整 cookie，至少含 SID / HSID / SSID / APISID / SAPISID / __Secure-1PSID）")
+		return 0, fmt.Errorf("cookie is missing SAPISID; copy the full gemini.google.com cookie string (including SID / HSID / SSID / APISID / SAPISID / __Secure-1PSID)")
 	}
 	warnMissingOSID(label, c)
 	return accountInsert(label, c, note)
@@ -136,11 +136,11 @@ func accountAdd(label, cookie, note string) (int64, error) {
 func accountAdopt(label, cookie, note string) (int64, error) {
 	cookie, ok := normalizeCookie(cookie, label)
 	if !ok {
-		return 0, fmt.Errorf("cookie 解析失败")
+		return 0, fmt.Errorf("failed to parse cookie")
 	}
 	if extractSAPISID(cookie) == "" {
-		logf("[cookie] %s 里没有 SAPISID，算不出 SAPISIDHASH 授权头，可能只当匿名处理；"+
-			"先按原样导入，请到面板核对", label)
+		logf("[cookie] %s is missing SAPISID; unable to compute SAPISIDHASH and requests may be treated as anonymous; "+
+			"importing unchanged; verify in admin panel", label)
 	}
 	warnMissingOSID(label, cookie)
 	return accountInsert(label, cookie, note)
@@ -149,7 +149,7 @@ func accountAdopt(label, cookie, note string) (int64, error) {
 func accountInsert(label, cookie, note string) (int64, error) {
 	cookie = strings.TrimSpace(cookie)
 	if cookie == "" {
-		return 0, fmt.Errorf("cookie 不能为空")
+		return 0, fmt.Errorf("cookie cannot be empty")
 	}
 	return insertID(
 		`INSERT INTO accounts(label, cookie, status, note, created_at) VALUES (?,?,?,?,?)`,
@@ -203,7 +203,7 @@ func accountDelete(id int64) error {
 // accountSetStatus 改状态（enabled / disabled）。
 func accountSetStatus(id int64, status string) error {
 	if status != "enabled" && status != "disabled" {
-		return fmt.Errorf("非法状态 %q", status)
+		return fmt.Errorf("invalid status %q", status)
 	}
 	_, err := getDB().Exec(`UPDATE accounts SET status=? WHERE id=?`, status, id)
 	return err
@@ -222,7 +222,7 @@ const maxAuthUser = 9
 // accountSetAuthUser 改账号序号（/u/N 里的 N）。
 func accountSetAuthUser(id int64, n int) error {
 	if n < 0 || n > maxAuthUser {
-		return fmt.Errorf("账号序号要在 0..%d 之间，收到 %d", maxAuthUser, n)
+		return fmt.Errorf("account index must be between 0 and %d (got %d)", maxAuthUser, n)
 	}
 	_, err := getDB().Exec(`UPDATE accounts SET authuser=? WHERE id=?`, n, id)
 	return err
@@ -246,7 +246,7 @@ const (
 // seedCookiesFromConfig 把启动参数和历史遗留的单 cookie 并进 cookie 池。
 //
 // cookie 原来也有两个入口：cookie 池，和「设置」页那个池空时才用的单 cookie 输入
-// （值存 kv 的 google_cookie，或来自 --cookie-file）。跟静态代理同一个毛病 ——
+// （值存 kv 的 google_cookie，或Imported from --cookie-file）。跟静态代理同一个毛病 ——
 // 单 cookie 路径返回的账号 ID 是 0，而 markAccountResult 开头就是 id<=0 直接返回，
 // 于是**健康度一个字都不写**：fail_count 恒为 0、last_ok_at 恒为空，也没有轮转。
 //
@@ -269,16 +269,16 @@ func migrateLegacyCookie() {
 		_ = kvSet(kvLegacyCookieDone, "1")
 		return
 	}
-	cookie, ok := normalizeCookie(raw, "「设置」页的单 cookie")
+	cookie, ok := normalizeCookie(raw, "legacy single cookie from Settings")
 	if !ok {
 		return
 	}
 	if !poolHasCookie(cookie) {
-		if _, err := accountAdopt("原单 cookie", cookie, "从「设置」页迁入"); err != nil {
-			logf("[cookie] 「设置」页的单 cookie 迁入池子失败，原值保留、下次启动重试: %v", err)
+		if _, err := accountAdopt("Legacy single cookie", cookie, "Migrated from Settings"); err != nil {
+			logf("[cookie] legacy single cookie from Settings 迁入池子失败，原值保留、下次启动重试: %v", err)
 			return
 		}
-		logf("[cookie] 「设置」页的单 cookie 已迁入 cookie 池")
+		logf("[cookie] legacy single cookie from Settings 已迁入 cookie 池")
 	}
 	_ = kvSet(kvLegacyCookieDone, "1")
 }
@@ -296,7 +296,7 @@ func syncSeededCookieFile() {
 		if err != nil {
 			// 读不到就当没配过：宁可保持现状，也不能因为容器少挂一个卷
 			// 就把用户在用的 cookie 撤下来。
-			logf("[cookie] 读不了 --cookie-file %s，池子保持不变: %v", cfg.CookieFile, err)
+			logf("[cookie] cannot read --cookie-file %s; keeping pool unchanged: %v", cfg.CookieFile, err)
 			return
 		}
 		cur = strings.TrimSpace(string(data))
@@ -317,7 +317,7 @@ func syncSeededCookieFile() {
 	if cur == "" {
 		_ = kvSet(kvSeededCookieVal, "")
 		_ = kvSet(kvSeededCookieID, "")
-		logf("[cookie] --cookie-file 已移除，对应的池子记录一并撤下")
+		logf("[cookie] --cookie-file removed; removing matching pool entry")
 		return
 	}
 	if poolHasCookie(cur) {
@@ -325,14 +325,14 @@ func syncSeededCookieFile() {
 		_ = kvSet(kvSeededCookieID, "")
 		return
 	}
-	id, err := accountAdopt("cookie-file", cur, "来自 --cookie-file")
+	id, err := accountAdopt("cookie-file", cur, "Imported from --cookie-file")
 	if err != nil {
-		logf("[cookie] --cookie-file 入池失败: %v", err)
+		logf("[cookie] failed to import --cookie-file into pool: %v", err)
 		return
 	}
 	_ = kvSet(kvSeededCookieVal, cur)
 	_ = kvSet(kvSeededCookieID, strconv.FormatInt(id, 10))
-	logf("[cookie] --cookie-file 的 cookie 已加入 cookie 池")
+	logf("[cookie] imported --cookie-file into pool")
 }
 
 // dropSeededCookie 撤掉上一次由 --cookie-file 建的那条。
@@ -350,7 +350,7 @@ func dropSeededCookie(prevCookie string) {
 		if a.ID == id {
 			if a.Cookie == prevCookie {
 				if err := accountDelete(id); err != nil {
-					logf("[cookie] 撤下旧的 --cookie-file 记录失败: %v", err)
+					logf("[cookie] failed to remove old --cookie-file entry: %v", err)
 				}
 			}
 			return
@@ -380,7 +380,7 @@ func normalizeCookie(raw, who string) (string, bool) {
 	}
 	var m map[string]interface{}
 	if err := json.Unmarshal([]byte(raw), &m); err != nil {
-		logf("[cookie] %s 是 JSON 但解析失败，跳过: %v", who, err)
+		logf("[cookie] %s is JSON but cannot be parsed; skipping: %v", who, err)
 		return "", false
 	}
 	if c, ok := m["cookie"].(string); ok && strings.TrimSpace(c) != "" {
@@ -411,7 +411,7 @@ func normalizeCookie(raw, who string) (string, bool) {
 		parts = append(parts, k+"="+str(k))
 	}
 	if len(parts) == 0 {
-		logf("[cookie] %s 是 JSON 但一项非空值都没有，跳过", who)
+		logf("[cookie] %s is JSON but has no nonempty values; skipping", who)
 		return "", false
 	}
 	return strings.Join(parts, "; "), true
@@ -542,7 +542,7 @@ func autoDisableIfDead(id int64) {
 	}
 	if _, err := getDB().Exec(
 		`UPDATE accounts SET status='disabled' WHERE id=? AND status='enabled'`, id); err == nil {
-		logf("[cookie] 账号 #%d 连续 %d 次鉴权失败，已自动停用", id, fails)
+		logf("[cookie] account #%d had %d consecutive auth failures and was disabled automatically", id, fails)
 	}
 }
 
@@ -565,13 +565,13 @@ func checkAccountCookie(a CookieAccount) CookieCheck {
 	t0 := time.Now()
 	picked, ok, err := acquireSlot(a.ProxyID)
 	if !ok {
-		return CookieCheck{Detail: "拿不到出口：" + err.Error()}
+		return CookieCheck{Detail: "no available egress: " + err.Error()}
 	}
 	defer releaseSlot(picked.ID)
 	proxyURL := picked.URL
 	name := picked.Name
 	if name == "" {
-		name = "直连"
+		name = "Direct"
 	}
 
 	// 先作废缓存，否则可能拿到几分钟前的旧结论，检测就没意义了
@@ -586,9 +586,9 @@ func checkAccountCookie(a CookieAccount) CookieCheck {
 		return CookieCheck{Detail: explainCookieFailure(err), ProxyName: name, TookMs: took}
 	}
 	markAccountResult(a.ID, true, "")
-	detail := "登录态有效"
+	detail := "authenticated session valid"
 	if extractSAPISID(a.Cookie) == "" {
-		detail += "，但缺 SAPISID（算不出授权头，部分接口会被当匿名）"
+		detail += ", but SAPISID is missing (cannot sign auth header; some requests may be anonymous)"
 	}
 	return CookieCheck{OK: true, Detail: detail, ProxyName: name, TookMs: took}
 }
@@ -598,16 +598,16 @@ func explainCookieFailure(err error) string {
 	msg := err.Error()
 	switch {
 	case strings.Contains(msg, "no SNlM0e"):
-		return "cookie 已失效：页面能打开但没有登录态，请求会被当匿名处理"
+		return "cookie expired: page loads without authentication; requests may be anonymous"
 	// sorry 要排在 302 前面：跳 /sorry 也是 302，那是出口被拦不是 cookie 失效
 	case strings.Contains(msg, "HTTP 429"), strings.Contains(msg, "sorry"):
-		return "出口被上游限流，换个代理再试（不是 cookie 的问题）"
+		return "egress rate limited upstream; try another proxy (not a cookie issue)"
 	case strings.Contains(msg, "缺 OSID"):
-		return "cookie 缺 OSID：gemini.google.com 现在要求这一项，请在 gemini.google.com 页面重新导出"
+		return "cookie missing OSID: gemini.google.com requires this field; re-export cookies"
 	case strings.Contains(msg, "HTTP 302"):
-		return "cookie 无效：被重定向到登录页"
+		return "invalid cookie: redirected to login page"
 	default:
-		return "检测失败：" + msg
+		return "check failed: " + msg
 	}
 }
 
@@ -705,7 +705,7 @@ func updateAccountCookie(id int64, cookie string) {
 	var cur string
 	if err := getDB().QueryRow(`SELECT cookie FROM accounts WHERE id=?`, id).Scan(&cur); err == nil {
 		if got, want := cookieIdentity(cookie), cookieIdentity(cur); got != want {
-			logf("[cookie] 账号 #%d 的刷新结果身份对不上，已丢弃不写回", id)
+			logf("[cookie] account #%d refresh returned a different identity; discarding changes", id)
 			return
 		}
 	}
