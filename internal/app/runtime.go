@@ -142,7 +142,7 @@ func initRuntimeConfig() {
 			if err := validateRuntimeConfig(saved); err == nil {
 				base = saved
 			} else {
-				logf("[config] 忽略 kv 里不合法的运行时配置: %v", err)
+				logf("[config] ignoring invalid runtime configuration from KV store: %v", err)
 			}
 		}
 	}
@@ -165,7 +165,7 @@ func rtCfg() RuntimeConfig {
 // 装好之前，rtCfg() 还是零值，logf 一定不打。
 func replaceRetiredDefault(c *RuntimeConfig) {
 	if m, ok := Models[c.DefaultModel]; ok && m.Retired != "" {
-		fmt.Fprintf(os.Stderr, "[config] 默认模型 %s 已下线，改用 %s\n", c.DefaultModel, fallbackDefaultModel)
+		fmt.Fprintf(os.Stderr, "[config] default model %s retired; switching to %s\n", c.DefaultModel, fallbackDefaultModel)
 		c.DefaultModel = fallbackDefaultModel
 	}
 }
@@ -196,17 +196,17 @@ func validateRuntimeConfig(c RuntimeConfig) error {
 		{"stream_idle_timeout_sec", c.StreamIdleTimeoutSec, 0, 600},
 	} {
 		if r.v < r.min || r.v > r.max {
-			return fmt.Errorf("%s=%d 超出允许范围 [%d, %d]", r.name, r.v, r.min, r.max)
+			return fmt.Errorf("%s=%d outside allowed range [%d, %d]", r.name, r.v, r.min, r.max)
 		}
 	}
 	if _, _, err := resolveModel(c.DefaultModel); err != nil {
-		return fmt.Errorf("default_model 不可用: %v", err)
+		return fmt.Errorf("default_model unavailable: %v", err)
 	}
 	if c.Impersonate == "" {
-		return fmt.Errorf("impersonate 不能为空")
+		return fmt.Errorf("impersonate cannot be empty")
 	}
 	if c.GeminiBL == "" {
-		return fmt.Errorf("gemini_bl 不能为空")
+		return fmt.Errorf("gemini_bl cannot be empty")
 	}
 	return nil
 }
@@ -226,6 +226,6 @@ func saveRuntimeConfig(next RuntimeConfig) error {
 	rtMu.Lock()
 	rtVal = next
 	rtMu.Unlock()
-	logf("[config] 运行时配置已更新")
+	logf("[config] runtime configuration updated")
 	return nil
 }
