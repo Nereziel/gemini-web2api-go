@@ -1,0 +1,59 @@
+name: Windows Server release v4.32.1
+
+# One-time publication when the OpenAI Images adapter lands on main.
+# Manual reruns are possible without rebuilding unrelated platforms.
+on:
+  push:
+    branches: [main]
+    paths:
+      - internal/app/images_api.go
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release-v4.32.1
+  cancel-in-progress: false
+
+jobs:
+  windows-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Verify release version
+        shell: bash
+        run: |
+          grep -qx 'const Version = "4.32.1"' internal/app/server.go
+      - name: Run Go tests
+        run: go test ./...
+      - name: Build Windows Server 64-bit executable
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags="-s -w" -o dist/gemini-web2api-go_v4.32.1_windows_amd64.exe .
+          cd dist
+          sha256sum gemini-web2api-go_v4.32.1_windows_amd64.exe > SHA256SUMS.txt
+      - name: Publish Windows release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v4.32.1
+          target_commitish: ${{ github.sha }}
+          name: v4.32.1 — Windows Server (OpenAI Images API)
+          generate_release_notes: true
+          body: |
+            Windows Server x64 standalone executable (no Docker or Go required).
+            Adds POST /v1/images/generations backed by Gemini Web.
+            Download the .exe; pass --config as needed.
+            Requires a signed-in Gemini account cookie for image generation.
+          files: |
+            dist/gemini-web2api-go_v4.32.1_windows_amd64.exe
+            dist/SHA256SUMS.txt
