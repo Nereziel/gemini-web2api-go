@@ -42,7 +42,7 @@ func loadProxies() {
 	rows, err := getDB().Query(`SELECT id, name, url, enabled, weight, fail_count,
         COALESCE(last_used,0), COALESCE(last_error,''), created_at FROM proxies ORDER BY id`)
 	if err != nil {
-		logf("[proxy] 读取失败，保留上一次的代理池: %v", err)
+		logf("[proxy] read failed; retaining previous proxy pool: %v", err)
 		return
 	}
 	defer rows.Close()
@@ -52,14 +52,14 @@ func loadProxies() {
 		var enabled int
 		if err := rows.Scan(&p.ID, &p.Name, &p.URL, &enabled, &p.Weight, &p.FailCount,
 			&p.LastUsed, &p.LastError, &p.CreatedAt); err != nil {
-			logf("[proxy] 有行读不出来，保留上一次的代理池: %v", err)
+			logf("[proxy] failed to read rows; retaining previous proxy pool: %v", err)
 			return
 		}
 		p.Enabled = enabled == 1
 		list = append(list, p)
 	}
 	if err := rows.Err(); err != nil {
-		logf("[proxy] 遍历中断，保留上一次的代理池: %v", err)
+		logf("[proxy] iteration interrupted; retaining previous proxy pool: %v", err)
 		return
 	}
 	proxyMu.Lock()
@@ -98,7 +98,7 @@ const (
 	kvSeededProxyURL  = "seeded_proxy_url"
 )
 
-// seedProxiesFromConfig 把启动参数和历史遗留的「静态代理」并进代理池。
+// seedProxiesFromConfig 把Startup arguments和历史遗留的「静态代理」并进代理池。
 //
 // 以前代理有两个入口：代理池，和「设置」页那个单独的静态代理文本框（池空时才用）。
 // 后者不是"简单版"而是**残废版** —— 它走的是 picked.ID=0 这条路，于是跟直连共用
@@ -131,11 +131,11 @@ func migrateLegacyStaticProxy() {
 		return
 	}
 	if !poolHasProxyURL(v) {
-		if _, err := proxyCreate("原静态代理", v, 1); err != nil {
-			logf("[proxy] 「设置」页的静态代理迁入池子失败，原值保留、下次启动重试: %v", err)
+		if _, err := proxyCreate("Legacy static proxy", v, 1); err != nil {
+			logf("[proxy] failed to migrate legacy static proxy to pool; keeping original for retry at startup: %v", err)
 			return
 		}
-		logf("[proxy] 「设置」页的静态代理已迁入代理池")
+		logf("[proxy] migrated legacy static proxy into proxy pool")
 	}
 	_ = kvSet(kvLegacyProxyDone, "1")
 }
@@ -157,7 +157,7 @@ func legacyStaticProxy() string {
 
 // syncSeededProxy 让池子里跟着 --proxy / config.json 走一条记录。
 //
-// 启动参数是**声明式**的：值变了就更新同一条，而不是再加一条。按 URL 去重的写法
+// Startup arguments是**声明式**的：值变了就更新同一条，而不是再加一条。按 URL 去重的写法
 // 挡不住这个 —— 用户把 compose 里的代理换掉，旧那条会留在池子里继续 enabled、
 // 继续接流量，成了一条谁也不知道还在用的僵尸出口。
 //
@@ -172,7 +172,7 @@ func syncSeededProxy() {
 	if url == "" {
 		_ = kvSet(kvSeededProxyURL, "")
 		_ = kvSet(kvSeededProxyID, "")
-		logf("[proxy] --proxy 已从启动参数移除，对应的池子记录一并撤下")
+		logf("[proxy] --proxy was removed from startup arguments; removed matching pool entry")
 		return
 	}
 	if poolHasProxyURL(url) {
@@ -181,19 +181,19 @@ func syncSeededProxy() {
 		_ = kvSet(kvSeededProxyID, "")
 		return
 	}
-	id, err := proxyCreate("启动参数", url, 1)
+	id, err := proxyCreate("Startup arguments", url, 1)
 	if err != nil {
-		logf("[proxy] --proxy 入池失败: %v", err)
+		logf("[proxy] failed to add --proxy to proxy pool: %v", err)
 		return // 不记 URL，下次启动还会再试
 	}
 	_ = kvSet(kvSeededProxyURL, url)
 	_ = kvSet(kvSeededProxyID, strconv.FormatInt(id, 10))
-	logf("[proxy] --proxy / config.json 的代理已加入代理池")
+	logf("[proxy] added --proxy/config.json proxy to pool")
 }
 
-// dropSeededProxy 撤掉上一次由启动参数建的那条。
+// dropSeededProxy 撤掉上一次由Startup arguments建的那条。
 // 只在这条记录**还是我们建时那个 URL** 时才删 —— 用户在面板上把它改成别的出口了，
-// 就说明他接管了这条记录，不该被启动参数的变更连坐删掉。
+// 就说明他接管了这条记录，不该被Startup arguments的变更连坐删掉。
 func dropSeededProxy(prevURL string) {
 	idStr := kvGet(kvSeededProxyID)
 	if idStr == "" || prevURL == "" {
@@ -217,7 +217,7 @@ func dropSeededProxy(prevURL string) {
 		return
 	}
 	if err := proxyDelete(id); err != nil {
-		logf("[proxy] 撤下旧的启动参数代理失败: %v", err)
+		logf("[proxy] 撤下旧的Startup arguments代理失败: %v", err)
 	}
 }
 
@@ -372,7 +372,7 @@ func validateProxyURL(s string) error {
 			return nil
 		}
 	}
-	return errors.New("代理 URL 必须以 http:// / https:// / socks5:// / socks5h:// 开头")
+	return errors.New("proxy URL must begin with http://, https://, socks5:// or socks5h://")
 }
 
 func proxyUpdate(id int64, name, url string, enabled *bool, weight *int) error {
