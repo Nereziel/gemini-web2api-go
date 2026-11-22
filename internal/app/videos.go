@@ -297,7 +297,7 @@ func callOnVideoAccount(j *videoJob, mc ModelConfig, images []pendingUpload) (*S
 		}
 		if errors.Is(err, errVideoQuotaUsed) {
 			markVideoExhausted(acct.ID, videoQuotaReset(err))
-			logf("[video] %s: 账号 #%d 额度用完，换下一个账号", j.ID, acct.ID)
+			logf("[video] %s: account #%d quota exhausted; trying another account", j.ID, acct.ID)
 			continue
 		}
 		var pinned *pinnedAccountError
