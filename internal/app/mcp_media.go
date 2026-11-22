@@ -169,7 +169,7 @@ func getVideoStatusToolDef() map[string]interface{} {
 func mcpCreateVideo(args map[string]interface{}) (map[string]interface{}, error) {
 	prompt := strings.TrimSpace(getStr(args, "prompt"))
 	if prompt == "" {
-		return nil, fmt.Errorf("prompt 不能为空")
+		return nil, fmt.Errorf("prompt cannot be empty")
 	}
 	size, err := videoSize(map[string]any{"size": getStr(args, "size")})
 	if err != nil {
