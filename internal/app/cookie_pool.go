@@ -602,7 +602,7 @@ func explainCookieFailure(err error) string {
 	// sorry 要排在 302 前面：跳 /sorry 也是 302，那是出口被拦不是 cookie 失效
 	case strings.Contains(msg, "HTTP 429"), strings.Contains(msg, "sorry"):
 		return "egress rate limited upstream; try another proxy (not a cookie issue)"
-	case strings.Contains(msg, "缺 OSID"):
+	case strings.Contains(msg, "missing OSID") || strings.Contains(msg, "缺 OSID"):
 		return "cookie missing OSID: gemini.google.com requires this field; re-export cookies"
 	case strings.Contains(msg, "HTTP 302"):
 		return "invalid cookie: redirected to login page"
