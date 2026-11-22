@@ -114,6 +114,8 @@ func Run() {
 			writeJSON(w, 405, map[string]string{"error": "method not allowed"})
 		}
 	}))
+	// OpenAI Images API adapter backed by Gemini Web image generation.
+	mux.HandleFunc("/v1/images/generations", requireAPIKey(handleImageGenerations))
 	// /v1/videos —— OpenAI(Sora) 形状的异步视频生成。POST 建任务，GET 轮询，GET .../content 下 MP4。
 	mux.HandleFunc("/v1/videos", requireAPIKey(handleCreateVideo))
 	mux.HandleFunc("/v1/videos/", requireAPIKey(handleVideoItem))
