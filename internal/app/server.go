@@ -157,7 +157,7 @@ func callGemini(prompt, latest string, mc ModelConfig, tools []map[string]interf
 		if len(res.Artifacts) == 0 {
 			cause := res.MediaErr
 			if cause == nil {
-				cause = errors.New("媒体产物取回失败")
+				cause = errors.New("failed to retrieve media artifact")
 			}
 			return "", nil, res, fmt.Errorf("media generation succeeded but artifact retrieval failed: %w", cause)
 		}
