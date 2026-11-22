@@ -137,11 +137,11 @@ func TestAppPageStatusErrorText(t *testing.T) {
 // 跳 /sorry 也是 302，文案不能说成「重定向到登录页」。
 func TestExplainCookieFailureSorry(t *testing.T) {
 	got := explainCookieFailure(newAppPageStatusError(302, "https://www.google.com/sorry/index"))
-	if got != "出口被上游限流，换个代理再试（不是 cookie 的问题）" {
+	if got != "egress rate limited upstream; try another proxy (not a cookie issue)" {
 		t.Errorf("sorry 302: got %q", got)
 	}
 	got = explainCookieFailure(newAppPageStatusError(302, "https://accounts.google.com/ServiceLogin"))
-	if got != "cookie 无效：被重定向到登录页" {
+	if got != "invalid cookie: redirected to login page" {
 		t.Errorf("login 302: got %q", got)
 	}
 }
@@ -153,7 +153,7 @@ func TestAppPageErrorMissingOSID(t *testing.T) {
 	if !e.MissingOSID || !xsrfErrBlamesCookie(e) {
 		t.Fatalf("缺 OSID 跳登录：MissingOSID=%v blames=%v", e.MissingOSID, xsrfErrBlamesCookie(e))
 	}
-	if got := explainCookieFailure(e); got != "cookie 缺 OSID：gemini.google.com 现在要求这一项，请在 gemini.google.com 页面重新导出" {
+	if got := explainCookieFailure(e); got != "cookie missing OSID: gemini.google.com requires this field; re-export cookies" {
 		t.Errorf("explain: got %q", got)
 	}
 	if e := appPageError(302, login, "SID=a; OSID=c; SAPISID=b"); e.MissingOSID {
