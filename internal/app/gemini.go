@@ -359,7 +359,7 @@ func acquireSlot(preferProxyID int64) (Proxy, bool, error) {
 		// 悄悄直连等于把这个前提废掉，而且日志上只是几条普通请求，很难发现。
 		// 要可用性优先于隐藏 IP 的部署可以打开 fallback_direct。
 		if ok, reason := trySlotAcquire(0); ok {
-			logf("[proxy] 代理池无可用出口，本次退回直连（fallback_direct 已开）")
+			logf("[proxy] no available proxy; falling back to direct connection (fallback_direct enabled)")
 			return Proxy{}, true, nil
 		} else {
 			return Proxy{}, false, &RateLimitError{Reason: reason, ProxyID: 0}
@@ -583,7 +583,7 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 			if _, _, rerr := rotateAccount(*acct); rerr == nil {
 				if fresh := accountByID(acct.ID); fresh != nil {
 					if tok2, err2 := getXSRF(fresh.Cookie, fresh.AuthUser, proxyURL); err2 == nil {
-						logf("[cookie] 账号 #%d 轮转后恢复可用", acct.ID)
+						logf("[cookie] account #%d recovered after rotation", acct.ID)
 						acct = fresh
 						cookieStr, sapisid, xsrfToken = fresh.Cookie, extractSAPISID(fresh.Cookie), tok2
 						authUser = fresh.AuthUser
@@ -601,7 +601,7 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 			markCookieByStatus(acct.ID, 401, err.Error())
 		}
 		lastCookieErr = err
-		logf("[cookie] 账号 #%d 不可用，换下一个：%v", acct.ID, err)
+		logf("[cookie] account #%d unavailable; trying another: %v", acct.ID, err)
 		if mc.PinAccountID > 0 {
 			acct = nil // pinned: never switch to another account mid-conversation
 			continue
@@ -628,11 +628,11 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 			// 默认报错而不是降级：cookie 失效后上游不会拒绝，只是把你当匿名用户，
 			// 纯文本请求照样 200 —— 于是 3.1 Pro 被静默降级成 3.5 Flash-Lite、
 			// 思考链消失，客户端完全看不出来。宁可明确失败也不给假的成功。
-			return attrib(fmt.Errorf("cookie 池里 %d 个账号都不可用（最后一个：%w）；"+
-				"到面板「Cookie 池」用「检测」按钮逐个排查，或打开 fallback_anon 降级匿名",
+			return attrib(fmt.Errorf("all %d cookie pool accounts are unavailable (last error: %w); "+
+				"check each account using the Check button in the Cookie Pool panel or enable fallback_anon",
 				len(tried), lastCookieErr))
 		}
-		logf("[cookie] 试过的 %d 个账号都不可用，本次降级匿名（能力会退化到匿名档）", len(tried))
+		logf("[cookie] all %d attempted accounts unavailable; falling back to anonymous mode (reduced capabilities)", len(tried))
 		cookieID, cookieLabel = 0, ""
 	}
 
@@ -657,7 +657,7 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 		for _, u := range pending {
 			ref, uerr := uploadBytes(cookieStr, authUser, proxyURL, u.Data, u.Name)
 			if uerr != nil {
-				return attrib(fmt.Errorf("上传附件 %s 失败: %w", u.Name, uerr))
+				return attrib(fmt.Errorf("failed to upload attachment %s: %w", u.Name, uerr))
 			}
 			files = append(files, fileRef{Ref: ref, Name: u.Name, Kind: u.Kind, Mime: u.Mime})
 			if u.Kind == 2 {
@@ -666,7 +666,7 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 				nImg++
 			}
 		}
-		logf("[vision] 上传了 %d 张图 / %d 个视频", nImg, nVid)
+		logf("[vision] uploaded %d images / %d videos", nImg, nVid)
 	}
 
 	// prompt 超长时转成文本附件。要等挑完号和出口才能做：上传要 cookie，
@@ -899,7 +899,7 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 				break
 			}
 			if !retryAfterTimeout(err) {
-				logf("上游超时，retry_on_timeout 关着，不再重试: %v", err)
+				logf("upstream timed out; retry_on_timeout disabled, not retrying: %v", err)
 				break
 			}
 			if attempt < rtCfg().RetryAttempts-1 {
@@ -960,7 +960,7 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 				break
 			}
 			if attempt < rtCfg().RetryAttempts-1 {
-				logf("retry %d/%d: 空响应（无内容帧，%d 字节）", attempt+1, rtCfg().RetryAttempts, len(raw))
+				logf("retry %d/%d: empty response (no content frames, %d bytes)", attempt+1, rtCfg().RetryAttempts, len(raw))
 				time.Sleep(time.Duration(rtCfg().RetryDelaySec) * time.Second)
 			}
 			continue
@@ -1014,11 +1014,11 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 				cookieStr, sapisid, xsrfToken, proxyURL, mime, authUser)
 			result.ConvRCID = rcid
 			if aerr != nil {
-				logf("[media] 取回产物失败: %v", aerr)
+				logf("[media] failed to retrieve artifact: %v", aerr)
 				result.MediaErr = aerr
 			} else {
 				result.Artifacts = arts
-				logf("[media] 取回 %d 份产物", len(arts))
+				logf("[media] retrieved %d artifact(s)", len(arts))
 			}
 		}
 		// #19 自动删会话：出完结果把 gemini.google.com 上留下的这条会话删掉，避免
@@ -1600,7 +1600,7 @@ func probeGemini(prompt, proxyURL string) ProbeResult {
 		req, e := http.NewRequest("POST", endpoint, strings.NewReader(body))
 		if e != nil {
 			res.Status = "network_error"
-			res.Diagnostic = "构建请求失败: " + e.Error()
+			res.Diagnostic = "failed to construct request: " + e.Error()
 			return res
 		}
 		applyChromeHeaders(req)
@@ -1611,7 +1611,7 @@ func probeGemini(prompt, proxyURL string) ProbeResult {
 		resp, e := client.Do(req)
 		if e != nil {
 			res.Status = "network_error"
-			res.Diagnostic = "网络层错误（DNS/TCP/TLS 失败）: " + e.Error()
+			res.Diagnostic = "network error (DNS/TCP/TLS failure): " + e.Error()
 			return res
 		}
 		defer resp.Body.Close()
@@ -1622,7 +1622,7 @@ func probeGemini(prompt, proxyURL string) ProbeResult {
 		req, e := fhttp.NewRequest("POST", endpoint, strings.NewReader(body))
 		if e != nil {
 			res.Status = "network_error"
-			res.Diagnostic = "构建请求失败: " + e.Error()
+			res.Diagnostic = "failed to construct request: " + e.Error()
 			return res
 		}
 		applyBrowserFHeaders(req)
@@ -1633,7 +1633,7 @@ func probeGemini(prompt, proxyURL string) ProbeResult {
 		resp, e := client.Do(req)
 		if e != nil {
 			res.Status = "network_error"
-			res.Diagnostic = "网络层错误（DNS/TCP/TLS 失败）: " + e.Error()
+			res.Diagnostic = "network error (DNS/TCP/TLS failure): " + e.Error()
 			return res
 		}
 		defer resp.Body.Close()
@@ -1648,30 +1648,30 @@ func probeGemini(prompt, proxyURL string) ProbeResult {
 	switch {
 	case statusCode == 302:
 		res.Status = "blocked_sorry"
-		res.Diagnostic = "IP 被 Google 风控（重定向到 sorry/index）。" +
-			"通常 6-24 小时解除，或换 VPN/代理 IP 立即恢复。Location: " + truncate(locHeader, 200)
+		res.Diagnostic = "Google blocked the IP (redirected to sorry/index). " +
+			"Usually clears within 6–24 hours; switch VPN/proxy IP for immediate recovery. Location: " + truncate(locHeader, 200)
 		return res
 	case statusCode == 429:
 		res.Status = "rate_limited"
-		res.Diagnostic = "Google 直接返回 429 限流。同样是 IP 嫌疑，但风控分支不同（朴素 SDK 路径）。"
+		res.Diagnostic = "Google returned HTTP 429 (rate limited). This also indicates IP-based restrictions, via a different upstream flow."
 		return res
 	case statusCode != 200:
 		res.Status = "upstream_error"
-		res.Diagnostic = fmt.Sprintf("上游返回非 200 (HTTP %d)，可能是协议变更或临时故障。", statusCode)
+		res.Diagnostic = fmt.Sprintf("Upstream returned HTTP %d instead of 200 (possible protocol change or temporary failure).", statusCode)
 		return res
 	}
 
 	text := extractResponseText(string(raw))
 	if text == "" {
 		res.Status = "upstream_error"
-		res.Diagnostic = "上游 200 但只回了结束帧、没有内容帧，通常是请求被服务端拒绝" +
-			"（例如带了不被接受的会话 id 或工具开关），不是帧格式变更。"
+		res.Diagnostic = "Upstream returned 200 with only an end frame and no content frame. The server likely rejected the request" +
+			" (for example, unsupported conversation ID or tool option), not a frame format change."
 		return res
 	}
 
 	res.OK = true
 	res.Status = "success"
 	res.ResponseText = truncate(text, 200)
-	res.Diagnostic = "调用成功。延迟 / 内容见上面字段。"
+	res.Diagnostic = "Request succeeded; see latency and response fields above."
 	return res
 }
