@@ -266,7 +266,7 @@ func newAppPageStatusError(status int, location string) *appPageStatusError {
 
 func (e *appPageStatusError) Error() string {
 	if e.MissingOSID {
-		return fmt.Sprintf("fetch /app: HTTP %d -> %s (cookie 缺 OSID)", e.Status, e.Location)
+		return fmt.Sprintf("fetch /app: HTTP %d -> %s (cookie missing OSID)", e.Status, e.Location)
 	}
 	if e.Location != "" {
 		return fmt.Sprintf("fetch /app: HTTP %d -> %s", e.Status, e.Location)
