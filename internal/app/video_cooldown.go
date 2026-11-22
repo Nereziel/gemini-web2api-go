@@ -41,7 +41,7 @@ func markVideoExhausted(id, reset int64) {
 	videoCooldownMu.Lock()
 	videoCooldown[id] = until
 	videoCooldownMu.Unlock()
-	logf("[video] 账号 #%d 视频额度用完，%s 前新视频跳过它", id, time.Unix(until, 0).Format("15:04"))
+	logf("[video] account #%d video quota exhausted; skip new video requests until %s", id, time.Unix(until, 0).Format("15:04"))
 }
 
 // videoCoolingAccounts returns the accounts still in their cooldown (expired ones are dropped).
