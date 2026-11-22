@@ -471,12 +471,12 @@ func handleAdminUsage(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]interface{}, 0, len(usage))
 	for _, u := range usage {
-		name := "直连"
+		name := "Direct"
 		if u.ProxyID > 0 {
 			if n, ok := proxyNames[u.ProxyID]; ok {
 				name = n
 			} else {
-				name = "(已删除)"
+				name = "(deleted)"
 			}
 		}
 		out = append(out, map[string]interface{}{
@@ -572,7 +572,7 @@ func handleAdminTest(w http.ResponseWriter, r *http.Request) {
 		}
 		if proxyURL == "" {
 			useDirect = true
-			proxyName = "直连"
+			proxyName = "Direct"
 		}
 	} else {
 		var err error
@@ -583,7 +583,7 @@ func handleAdminTest(w http.ResponseWriter, r *http.Request) {
 		}
 		if proxyID == 0 {
 			useDirect = true
-			proxyName = "直连"
+			proxyName = "Direct"
 		} else {
 			found := false
 			for _, p := range listProxies() {
