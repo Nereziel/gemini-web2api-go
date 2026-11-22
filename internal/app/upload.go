@@ -22,10 +22,10 @@ const uploadHost = "https://push.clients6.google.com/upload/"
 func uploadBytes(cookie string, authuser int, proxyURL string, data []byte, filename string) (string, error) {
 	pushID, pctx, err := getUploadTokens(cookie, authuser, proxyURL)
 	if err != nil {
-		return "", fmt.Errorf("取上传页面参数失败: %w", err)
+		return "", fmt.Errorf("failed to obtain upload page parameters: %w", err)
 	}
 	if pushID == "" {
-		return "", fmt.Errorf("页面里没有 push_id，无法上传")
+		return "", fmt.Errorf("upload page did not contain push_id")
 	}
 
 	base := map[string]string{
@@ -66,14 +66,14 @@ func uploadBytes(cookie string, authuser int, proxyURL string, data []byte, file
 	status, respHead, body, err := uploadPost(uploadStartURL(authuser), startHeaders,
 		[]byte("File name: "+sanitizeUploadName(filename)), proxyURL)
 	if err != nil {
-		return "", fmt.Errorf("上传 start 失败: %w", err)
+		return "", fmt.Errorf("upload start failed: %w", err)
 	}
 	if status != 200 {
-		return "", fmt.Errorf("上传 start 返回 HTTP %d: %s", status, truncate(string(body), 160))
+		return "", fmt.Errorf("upload start returned HTTP %d: %s", status, truncate(string(body), 160))
 	}
 	putURL := respHead["x-goog-upload-url"]
 	if putURL == "" {
-		return "", fmt.Errorf("上传 start 没返回 x-goog-upload-url")
+		return "", fmt.Errorf("upload start did not return x-goog-upload-url")
 	}
 
 	// 发字节并 finalize
@@ -84,16 +84,16 @@ func uploadBytes(cookie string, authuser int, proxyURL string, data []byte, file
 	})
 	status, _, body, err = uploadPost(putURL, upHeaders, data, proxyURL)
 	if err != nil {
-		return "", fmt.Errorf("上传 finalize 失败: %w", err)
+		return "", fmt.Errorf("upload finalize failed: %w", err)
 	}
 	if status != 200 {
-		return "", fmt.Errorf("上传 finalize 返回 HTTP %d: %s", status, truncate(string(body), 160))
+		return "", fmt.Errorf("upload finalize returned HTTP %d: %s", status, truncate(string(body), 160))
 	}
 	// 响应体就是引用路径。不以 "/" 开头说明拿到的是错误页，填进 payload 服务端
 	// 未必报错，但模型看到的附件是空的。
 	ref := strings.TrimSpace(string(body))
 	if !strings.HasPrefix(ref, "/") {
-		return "", fmt.Errorf("上传返回的不是引用路径: %s", truncate(ref, 160))
+		return "", fmt.Errorf("upload did not return a valid reference path: %s", truncate(ref, 160))
 	}
 	return ref, nil
 }

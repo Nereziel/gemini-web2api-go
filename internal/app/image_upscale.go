@@ -78,7 +78,7 @@ func findImageGenBlocks(raw string) [][]interface{} {
 	return out
 }
 
-// imageGenBlockKey 判断 arr 是不是图片信息块：[1][0] 是占位链、[0][3][5] 是令牌、[3] 是数组。
+// imageGenBlockKey 判断 arr 是not an image generation block：[1][0] 是占位链、[0][3][5] 是令牌、[3] 是数组。
 // 是就返回占位链，否则空串。
 func imageGenBlockKey(arr []interface{}) string {
 	if len(arr) < 4 {
@@ -108,7 +108,7 @@ func jsAt(v interface{}, i int) interface{} {
 // buildUpscaleParams 用一张图的信息块拼 c8o8Fe 的参数（JSON 字符串）。
 func buildUpscaleParams(block []interface{}, rid, rcid, cid string) (string, error) {
 	if imageGenBlockKey(block) == "" {
-		return "", fmt.Errorf("不是图片信息块")
+		return "", fmt.Errorf("not an image generation block")
 	}
 	tok := jsAt(jsAt(block[0], 3), 5).(string)
 	// 前 9 项原样回传（[3] 是生成参数、[8] 是图片编号 im_…，一轮多张图时靠它区分），
@@ -152,7 +152,7 @@ func downloadUpscaled(u, cookie, proxyURL, defaultMime string, authuser int) (st
 		}
 		return mime, data, nil
 	}
-	return "", nil, fmt.Errorf("放大图下载跳转次数过多")
+	return "", nil, fmt.Errorf("too many redirects downloading upscaled image")
 }
 
 // requestUpscale 发一次 c8o8Fe，返回放大图的下载链。
@@ -184,7 +184,7 @@ func requestUpscale(params, cid, cookie, sapisid, xsrf, proxyURL string, authuse
 			strings.Contains(s, "lh3.googleusercontent.com/gg/")
 	})
 	if len(urls) == 0 {
-		return "", fmt.Errorf("c8o8Fe 响应里没有下载链: %s", truncate(string(body), 160))
+		return "", fmt.Errorf("no download URL in c8o8Fe response: %s", truncate(string(body), 160))
 	}
 	return urls[0], nil
 }
@@ -193,7 +193,7 @@ func requestUpscale(params, cid, cookie, sapisid, xsrf, proxyURL string, authuse
 // 由调用方退回原来的下载方式（不重新生成）。
 func fetchUpscaledImages(raw, cid, rid, cookie, sapisid, xsrf, proxyURL, defaultMime string, authuser int) ([]MediaArtifact, error) {
 	if cid == "" || rid == "" || xsrf == "" {
-		return nil, fmt.Errorf("缺会话 id / 回复 id / XSRF，无法请求放大")
+		return nil, fmt.Errorf("missing conversation ID, response ID or XSRF; cannot upscale")
 	}
 	blocks := findImageGenBlocks(raw)
 	_, _, rcid, _ := parseConvIDs(raw)
@@ -213,10 +213,10 @@ func fetchUpscaledImages(raw, cid, rid, cookie, sapisid, xsrf, proxyURL, default
 		}
 	}
 	if len(blocks) == 0 {
-		return nil, fmt.Errorf("响应里没有图片信息块")
+		return nil, fmt.Errorf("no image generation blocks in response")
 	}
 	if rcid == "" {
-		return nil, fmt.Errorf("响应里没有回复候选 id（rc_）")
+		return nil, fmt.Errorf("missing response candidate ID (rc_)")
 	}
 	var arts []MediaArtifact
 	for _, b := range blocks {
@@ -234,7 +234,7 @@ func fetchUpscaledImages(raw, cid, rid, cookie, sapisid, xsrf, proxyURL, default
 		}
 		// downloadBytes 遇到 HTML 错误页会把类型填成默认值，所以按字节头判断。
 		if sniff := http.DetectContentType(data); !strings.HasPrefix(sniff, "image/") {
-			return nil, fmt.Errorf("放大图下载回来不是图片（%s，%d 字节）", sniff, len(data))
+			return nil, fmt.Errorf("upscaled download is not an image (%s, %d bytes)", sniff, len(data))
 		} else if !strings.HasPrefix(mime, "image/") {
 			mime = sniff
 		}

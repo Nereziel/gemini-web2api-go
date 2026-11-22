@@ -211,7 +211,7 @@ func getAnonSession(proxyURL string) (string, error) {
 		pairs = append(pairs, strings.TrimSpace(nv))
 	}
 	if len(pairs) == 0 {
-		return "", fmt.Errorf("匿名 /app 没返回 Set-Cookie")
+		return "", fmt.Errorf("anonymous /app did not return Set-Cookie")
 	}
 	return strings.Join(pairs, "; "), nil
 }
@@ -238,7 +238,7 @@ func streamGenerateConv(prompt string, mc ModelConfig, conv *convState,
 		if conv.cookie == "" && !conv.isLogin {
 			c, err := getAnonSession(proxyURL)
 			if err != nil {
-				return &StreamResult{ProxyID: p.ID, ProxyName: p.Name}, fmt.Errorf("建匿名会话失败: %w", err)
+				return &StreamResult{ProxyID: p.ID, ProxyName: p.Name}, fmt.Errorf("failed to create anonymous session: %w", err)
 			}
 			conv.cookie = c
 		}
@@ -251,7 +251,7 @@ func streamGenerateConv(prompt string, mc ModelConfig, conv *convState,
 			xsrf = tok
 		} else {
 			return &StreamResult{ProxyID: p.ID, ProxyName: p.Name, AccountID: conv.accountID},
-				fmt.Errorf("取 XSRF 失败: %w", err)
+				fmt.Errorf("failed to obtain XSRF: %w", err)
 		}
 	}
 
@@ -363,7 +363,7 @@ func streamGenerateConv(prompt string, mc ModelConfig, conv *convState,
 		}
 		if err != nil || statusCode != 200 || !hasContentFrame(string(raw)) {
 			if err == nil && statusCode == 200 {
-				lastErr = fmt.Errorf("续接无内容帧（会话可能已失效，raw %d 字节）", len(raw))
+				lastErr = fmt.Errorf("resumed conversation returned no content frame (session may have expired, %d raw bytes)", len(raw))
 			} else if err != nil {
 				lastErr = err
 			} else {
@@ -377,7 +377,7 @@ func streamGenerateConv(prompt string, mc ModelConfig, conv *convState,
 				break
 			}
 			if !retryAfterTimeout(err) {
-				logf("上游超时，retry_on_timeout 关着，不再重试: %v", err)
+				logf("upstream timed out; retry_on_timeout disabled, not retrying: %v", err)
 				break
 			}
 			if attempt < rtCfg().RetryAttempts-1 {
@@ -454,10 +454,10 @@ func callGeminiConv(messages []map[string]interface{}, mc ModelConfig,
 		// 首轮带上 tools 指令：模型要靠它知道怎么吐 tool_call 围栏，续接轮不再重发
 		//（指令已在服务端首轮历史里）。
 		prompt, _ = messagesToPrompt(messages, tools, toolChoice)
-		logf("[conv] 新会话，首轮发 %d 字节（tools=%d）", len(prompt), len(tools))
+		logf("[conv] new conversation; sending %d bytes in first turn (tools=%d)", len(prompt), len(tools))
 	} else {
 		prompt = buildPrompt(messages[prefixLen:], nil, nil)
-		logf("[conv] 续接命中 turn=%d，只发 %d 字节（新增 %d 条消息，历史留服务端）", conv.turn, len(prompt), len(messages)-prefixLen)
+		logf("[conv] resumed turn=%d; sending %d bytes (%d new messages; history retained upstream)", conv.turn, len(prompt), len(messages)-prefixLen)
 	}
 
 	// strict_model 换号只对新会话做：续接的会话绑死在原来的号上，降级了只记冷却、

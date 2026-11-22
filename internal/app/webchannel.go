@@ -118,14 +118,14 @@ func webChannelAPIKey(proxyURL string) (string, error) {
 		if wcKey != "" {
 			return wcKey, nil // 抓页失败先用旧的，key 很少变
 		}
-		return "", fmt.Errorf("取 processSession API key: %w", err)
+		return "", fmt.Errorf("failed to obtain processSession API key: %w", err)
 	}
 	m := wcKeyRe.FindSubmatch(body)
 	if m == nil {
 		if wcKey != "" {
 			return wcKey, nil
 		}
-		return "", errors.New("取 processSession API key: 页面里没有 d2zJAe")
+		return "", errors.New("failed to obtain processSession API key: no d2zJAe found on page")
 	}
 	wcKey, wcKeyAt = string(m[1]), time.Now()
 	return wcKey, nil
@@ -453,7 +453,7 @@ func doWebChannelRequest(r wcRequest, proxyURL string, onLine func(string) error
 	})
 	gsid := hs.sessionID
 	if sid == "" || gsid == "" {
-		return 502, []byte("processSession 握手没拿到会话: " + truncate(string(hsBody), 200)), 0, setCookie, nil
+		return 502, []byte("processSession handshake did not return a session: " + truncate(string(hsBody), 200)), 0, setCookie, nil
 	}
 	sess := fmt.Sprintf("gsessionid=%s&SID=%s", url.QueryEscape(gsid), url.QueryEscape(sid))
 
@@ -477,7 +477,7 @@ func doWebChannelRequest(r wcRequest, proxyURL string, onLine func(string) error
 			if g.status != 200 {
 				b, _ := io.ReadAll(io.LimitReader(g.body, 4096))
 				g.body.Close()
-				getErr <- fmt.Errorf("processSession 下行 HTTP %d: %s", g.status, truncate(string(b), 200))
+				getErr <- fmt.Errorf("processSession downstream HTTP %d: %s", g.status, truncate(string(b), 200))
 				return
 			}
 			readyOnce.Do(func() { close(getReady) })
@@ -529,7 +529,7 @@ func doWebChannelRequest(r wcRequest, proxyURL string, onLine func(string) error
 		b, _ := io.ReadAll(io.LimitReader(resp.body, 4096))
 		resp.body.Close()
 		if resp.status != 200 {
-			return fmt.Errorf("processSession 上行 ofs=%d HTTP %d: %s", ofs, resp.status, truncate(string(b), 200))
+			return fmt.Errorf("processSession upstream ofs=%d HTTP %d: %s", ofs, resp.status, truncate(string(b), 200))
 		}
 		return nil
 	}
@@ -544,7 +544,7 @@ func doWebChannelRequest(r wcRequest, proxyURL string, onLine func(string) error
 	case e := <-getErr:
 		return 0, nil, 0, setCookie, e
 	case <-ctx.Done():
-		return 0, nil, 0, setCookie, fmt.Errorf("processSession 下行没建立（%s）: %w", timeout, errUpstreamTimeout)
+		return 0, nil, 0, setCookie, fmt.Errorf("processSession downstream not established (%s): %w", timeout, errUpstreamTimeout)
 	}
 	if err := post(0, ofs0); err != nil {
 		return 0, nil, 0, setCookie, err
@@ -582,7 +582,7 @@ func doWebChannelRequest(r wcRequest, proxyURL string, onLine func(string) error
 				}
 				if ctx.Err() != nil {
 					return 0, []byte(raw.String()), ttfbOr(ttfb, sendAt), setCookie,
-						fmt.Errorf("processSession 超时（%s）: %w", timeout, errUpstreamTimeout)
+						fmt.Errorf("processSession timed out (%s): %w", timeout, errUpstreamTimeout)
 				}
 				return 200, []byte(raw.String()), ttfbOr(ttfb, sendAt), setCookie, nil
 			}
@@ -616,7 +616,7 @@ func doWebChannelRequest(r wcRequest, proxyURL string, onLine func(string) error
 			}
 		case <-ctx.Done():
 			return 0, []byte(raw.String()), ttfbOr(ttfb, sendAt), setCookie,
-				fmt.Errorf("processSession 超时（%s）: %w", timeout, errUpstreamTimeout)
+				fmt.Errorf("processSession timed out (%s): %w", timeout, errUpstreamTimeout)
 		}
 	}
 }

@@ -142,7 +142,7 @@ func fetchMediaArtifacts(tool int, raw, cid, rid, cookie, sapisid, xsrf, proxyUR
 			if err == nil && len(arts) > 0 {
 				return arts, "", nil
 			}
-			logf("[upscale] 放大失败，改下原图: %v", err)
+			logf("[upscale] upscaling failed; downloading original image: %v", err)
 		}
 		arts, err := fetchImageArtifacts(raw, cid, cookie, sapisid, xsrf, proxyURL, defaultMime, authuser)
 		return arts, "", err
@@ -300,7 +300,7 @@ func fetchImageArtifacts(raw, cid, cookie, sapisid, xsrf, proxyURL, defaultMime 
 		}
 	}
 	if len(urls) == 0 {
-		return nil, fmt.Errorf("响应里没有图片 CDN 链接")
+		return nil, fmt.Errorf("no image CDN URL in response")
 	}
 	var arts []MediaArtifact
 	for _, u := range urls {
@@ -341,7 +341,7 @@ func imageFullResURL(u string) string {
 func fetchDownloadArtifacts(cid, rid, cookie, sapisid, xsrf, proxyURL, defaultMime string, tool int,
 	maxPolls int, interval time.Duration, authuser int) ([]MediaArtifact, string, error) {
 	if cid == "" {
-		return nil, "", fmt.Errorf("没拿到会话 id，无法定位产物")
+		return nil, "", fmt.Errorf("missing conversation ID; cannot locate artifact")
 	}
 	var dlURLs []string
 	rcid := ""
@@ -374,7 +374,7 @@ func fetchDownloadArtifacts(cid, rid, cookie, sapisid, xsrf, proxyURL, defaultMi
 			}
 			// 视频被内容政策拒时 hNvQHb 里是「I can't generate that video」，别干等到超时。
 			if strings.Contains(body, "can't generate that video") {
-				return nil, rcid, fmt.Errorf("视频被内容政策拒绝（换个 prompt 再试）")
+				return nil, rcid, fmt.Errorf("video rejected by content policy (try a different prompt)")
 			}
 			// Daily video quota exhausted on this account: the reply is "I can create more
 			// videos as soon as your limit resets" with an internal "out of video generation
@@ -394,7 +394,7 @@ func fetchDownloadArtifacts(cid, rid, cookie, sapisid, xsrf, proxyURL, defaultMi
 		time.Sleep(interval)
 	}
 	if len(dlURLs) == 0 {
-		return nil, rcid, fmt.Errorf("hNvQHb 里没等到可下载的产物链接（response_data）")
+		return nil, rcid, fmt.Errorf("no downloadable artifact URL (response_data) received from hNvQHb")
 	}
 	var arts []MediaArtifact
 	for _, u := range dlURLs {
@@ -555,14 +555,14 @@ func deleteConversation(cid, cookie, sapisid, xsrf, proxyURL string, authuser in
 	delete(headers, "x-goog-ext-525001261-jspb")
 	status, _, body, err := uploadPost(endpoint, headers, []byte(form.Encode()), proxyURL)
 	if err != nil {
-		logf("[autodel] 删会话 %s 失败: %v", cid, err)
+		logf("[autodel] failed to delete conversation %s: %v", cid, err)
 		return
 	}
 	if status != 200 {
-		logf("[autodel] 删会话 %s 返回 HTTP %d: %s", cid, status, truncate(string(body), 120))
+		logf("[autodel] deleting conversation %s returned HTTP %d: %s", cid, status, truncate(string(body), 120))
 		return
 	}
-	logf("[autodel] 已删会话 %s", cid)
+	logf("[autodel] deleted conversation %s", cid)
 }
 
 // walkFramesForURLs 递归遍历 batchexecute 信封里所有字符串，返回 want 命中的那些（去重保序）。
@@ -684,7 +684,7 @@ func downloadBytes(rawURL, cookie, proxyURL, defaultMime string, authuser int) (
 		return "", nil, err
 	}
 	if status != 200 {
-		return "", nil, fmt.Errorf("下载产物 HTTP %d（%d 字节）", status, len(body))
+		return "", nil, fmt.Errorf("artifact download returned HTTP %d (%d bytes)", status, len(body))
 	}
 	mime := respHead["content-type"]
 	if i := strings.IndexByte(mime, ';'); i >= 0 {
@@ -722,7 +722,7 @@ func mediaGetFollow(rawURL string, headers map[string]string, proxyURL string) (
 		}
 		return status, respHead, body, nil
 	}
-	return 0, nil, nil, fmt.Errorf("下载重定向次数过多")
+	return 0, nil, nil, fmt.Errorf("too many artifact download redirects")
 }
 
 // resolveRef 按当前 URL 解析 Location（多数是绝对地址，也兼容相对）。

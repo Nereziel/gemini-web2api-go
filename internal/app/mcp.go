@@ -143,11 +143,11 @@ func dispatchMCP(req *rpcRequest) *rpcResponse {
 		case "web_search":
 			query := strings.TrimSpace(getStr(p.Arguments, "query"))
 			if query == "" {
-				return ok(toolTextError("query 不能为空"))
+				return ok(toolTextError("query cannot be empty"))
 			}
 			text, err := mcpWebSearch(query)
 			if err != nil {
-				return ok(toolTextError("搜索失败: " + err.Error()))
+				return ok(toolTextError("search failed: " + err.Error()))
 			}
 			return ok(map[string]interface{}{
 				"content": []interface{}{map[string]interface{}{"type": "text", "text": text}},
@@ -155,7 +155,7 @@ func dispatchMCP(req *rpcRequest) *rpcResponse {
 		case "generate_image", "generate_music":
 			prompt := strings.TrimSpace(getStr(p.Arguments, "prompt"))
 			if prompt == "" {
-				return ok(toolTextError("prompt 不能为空"))
+				return ok(toolTextError("prompt cannot be empty"))
 			}
 			model, refs := "gemini-image", mcpStrings(p.Arguments["image_urls"])
 			if p.Name == "generate_music" {
@@ -163,13 +163,13 @@ func dispatchMCP(req *rpcRequest) *rpcResponse {
 			}
 			result, err := mcpGenerateMedia(model, prompt, refs)
 			if err != nil {
-				return ok(toolTextError("生成失败: " + err.Error()))
+				return ok(toolTextError("generation failed: " + err.Error()))
 			}
 			return ok(result)
 		case "create_video_task":
 			result, err := mcpCreateVideo(p.Arguments)
 			if err != nil {
-				return ok(toolTextError("建任务失败: " + err.Error()))
+				return ok(toolTextError("failed to create task: " + err.Error()))
 			}
 			return ok(result)
 		case "get_video_status":
@@ -223,7 +223,7 @@ func mcpWebSearch(query string) (string, error) {
 	}
 	text := extractResponseText(res.Raw)
 	if text == "" {
-		return "", fmt.Errorf("上游没有返回内容")
+		return "", fmt.Errorf("upstream returned no content")
 	}
 	sources := extractGrounding(res.Raw)
 	var b strings.Builder

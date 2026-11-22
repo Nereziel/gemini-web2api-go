@@ -113,7 +113,7 @@ func retryOnAnotherAccount(res *StreamResult, err error, mc ModelConfig, exclude
 	}
 	markDowngraded(mde.AccountID, mc)
 	exclude[mde.AccountID] = true
-	logf("[strict_model] 账号 #%d 在 %s 上被降级成 %s", mde.AccountID, mc.Upstream, mde.Reported)
+	logf("[strict_model] account #%d downgraded from %s to %s", mde.AccountID, mc.Upstream, mde.Reported)
 	return res == nil || (res.Emitted == "" && res.EmittedReasoning == "")
 }
 
