@@ -2528,6 +2528,16 @@ const I18N_EN = {
   '许可证': 'License',
   '作者': 'Author',
 };
+// English coverage for newer runtime settings and diagnostics.
+Object.assign(I18N_EN, {
+  "流式保活（秒）": "Streaming keepalive (seconds)",
+  "超时后重试": "Retry on timeout",
+  "空闲超时（秒）": "Stream idle timeout (seconds)",
+  "开：上游等满「上游超时」还没回完时，按重试次数再发（默认）。关：超时直接报错——等满一次都没回完，重发多半还是超时，一个请求最坏要等「超时 × 重试次数」，超长输入或慢模型（如 Argon）下能拖十几分钟。其他失败（空响应、出错话术等）照常重试": "On (default): retry if the upstream request reaches its total timeout. Off: fail immediately on timeout, avoiding repeated waits for slow models or long prompts. Other retryable failures are unaffected.",
+  "流式请求连续这么多秒没往客户端写东西，就发一次保活，防止前面的 nginx / Cloudflare / newapi 等中间层因连接空闲回 504。建议 15。代价：保活要先开流（HTTP 200），之后再失败只能在流里报错、拿不到 502/429 状态码，依赖状态码换渠道的客户端会受影响；秒级就失败的请求不受影响。非流式请求无效。0=关（默认）": "Send a keepalive if nothing has been written to the streaming client for this many seconds, preventing idle 504 errors from nginx, Cloudflare or other gateways. Suggested: 15. Trade-off: once the response stream has started (HTTP 200), later errors cannot change the HTTP status to 502 or 429. Does not affect non-streaming requests. 0 = off (default).",
+  "上游开流后连续这么多秒一个 chunk 都不来，就掐断当瞬时错误重试。「上游超时」是整条请求的总时限，管不到\"首字节秒级就到、之后两三分钟一个字不来\"这种挂法——这个专补那个缺口，让卡住的请求几十秒就换一次而不是干等到总超时。掐断会无条件重试（不受「超时后重试」开关影响）。建议 60。设得太小会误伤慢模型（如 Argon 首字节本身就慢）。0=关（默认）": "If no upstream stream chunk arrives for this many seconds after streaming begins, abort and retry. This handles stalls after the first byte that a total request timeout cannot diagnose quickly. Applies even if Retry on timeout is disabled. Suggested: 60; avoid low values with slow models. 0 = off (default).",
+});
+
 const I18N_HTML_EN = {
   '实测单个出口打 <b>80-180 次</b>后会被 Google 重定向到 <code>sorry/index</code>， 轨道取的是这个区间的<b>下沿</b>。区间这么宽是因为它主要由连接策略和出口质量 决定：同样并发 10，复用连接池能打到 172/177，每次新建连接只有 106/109； 静态 IP 上到过 188。<br><br> <b>它不是一条硬线。</b>节奏才是关键 —— 10 次/分钟平缓地打，连打 800 次、 跨 110 分钟一次没被拦。所以这条轨道是保守参考，不是"到了就会挂"。<br><br> 被拦之后是硬拦（封后 20 分钟内 60 次探测 0 成功），106-121 分钟自动恢复。 红竖线是本地 RPH 限额的位置，超了直接返回 429 而不去消耗 Google 配额。 要放大产能就在「代理池」加代理，每个代理是独立 slot。':
     'Testing showed a single egress gets redirected to <code>sorry/index</code> by Google after <b>80-180 requests</b>; the track uses the <b>lower bound</b> of this range. This wide window is largely determined by connection strategy and egress quality: with concurrency 10, connection pool reuse reaches 172/177, while new connections each time yield only 106/109; static IPs reached 188.<br><br> <b>It is not a hard line.</b> Pacing is key — at a steady 10 requests/min, 800 consecutive requests over 110 minutes were never blocked. Thus this track is a conservative reference, not a cliff edge.<br><br> Once blocked, it is a hard block (0/60 probes succeeded within 20 min post-ban), recovering automatically in 106-121 min. The red vertical bar marks the local RPH limit, returning 429 directly once exceeded without exhausting Google quota. To scale capacity, add proxies in the Proxy Pool — each proxy acts as an independent slot.',
