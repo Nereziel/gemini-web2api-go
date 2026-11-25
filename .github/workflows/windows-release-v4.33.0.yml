@@ -1,17 +1,18 @@
-name: Windows Server release v4.32.2 (English)
+name: Windows Server release v4.33.0 (English)
 
 on:
   push:
     branches: [main]
     paths:
       - internal/app/server.go
+      - .github/workflows/windows-release-v4.33.0.yml
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: windows-release-v4.32.2
+  group: windows-release-v4.33.0
   cancel-in-progress: false
 
 jobs:
@@ -24,7 +25,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Verify version
-        run: grep -qx 'const Version = "4.32.2"' internal/app/server.go
+        run: grep -qx 'const Version = "4.33.0"' internal/app/server.go
       - name: Test
         run: go test ./...
       - name: Compile Windows x64
@@ -34,21 +35,22 @@ jobs:
           GOARCH: amd64
         run: |
           mkdir -p dist
-          go build -trimpath -ldflags="-s -w" -o dist/gemini-web2api-go_v4.32.2_windows_amd64.exe .
+          go build -trimpath -ldflags="-s -w" -o dist/gemini-web2api-go_v4.33.0_windows_amd64.exe .
           cd dist
-          sha256sum gemini-web2api-go_v4.32.2_windows_amd64.exe > SHA256SUMS.txt
+          sha256sum gemini-web2api-go_v4.33.0_windows_amd64.exe > SHA256SUMS.txt
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.32.2
+          tag_name: v4.33.0
           target_commitish: ${{ github.sha }}
-          name: v4.32.2 — English admin panel and server logs
+          name: v4.33.0 — English Windows Server build
           body: |
             Windows Server x64 executable.
             Admin panel defaults to English on first visit. Runtime settings,
             diagnostics and operational logs are translated into English.
             Existing explicit language preference remains respected.
-            Includes the OpenAI-compatible Images API added in v4.32.1.
+            Includes upstream v4.33.0 fixes to cookies, conversations and logging,
+            plus the browser cookie-sync extension and OpenAI-compatible Images API.
           files: |
-            dist/gemini-web2api-go_v4.32.2_windows_amd64.exe
+            dist/gemini-web2api-go_v4.33.0_windows_amd64.exe
             dist/SHA256SUMS.txt
