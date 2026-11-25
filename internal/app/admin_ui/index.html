@@ -1044,6 +1044,21 @@ const RT_GROUPS = [
     ],
   },
   {
+    title: '生图限流 · 全局',
+    fields: [
+      { k: 'image_max_concurrent', label: '生图并发上限', type: 'int', min: 0, max: 1000,
+        hint: '所有生图接口共享的并发上限，默认 1，0=不限' },
+      { k: 'image_rpm', label: '每分钟生图上限', type: 'int', min: 0, max: 10000,
+        hint: '滚动 60 秒窗口内的生图尝试次数，默认 3，0=不限' },
+      { k: 'image_rph', label: '每小时生图上限', type: 'int', min: 0, max: 100000,
+        hint: '滚动 1 小时窗口内的生图尝试次数，默认 30，0=不限' },
+      { k: 'image_min_interval_sec', label: '生图最小间隔（秒）', type: 'int', min: 0, max: 86400,
+        hint: '相邻生图尝试开始之间的最小间隔，默认 20 秒，0=关闭' },
+      { k: 'image_cooldown_on_429_sec', label: '生图 429 冷却（秒）', type: 'int', min: 0, max: 86400,
+        hint: '上游返回 HTTP 429 后暂停所有生图，默认 300 秒，0=关闭冷却；不立即重试' },
+    ],
+  },
+  {
     title: '重试与超时',
     fields: [
       { k: 'retry_attempts', label: '重试次数', type: 'int', min: 1, max: 10,
@@ -2624,6 +2639,17 @@ const I18N_EN = {
   '临时对话': 'Temporary chat',
   '走网页端原生「临时对话」（inner[45]=1）：会话压根不进账号的会话列表、不用于训练，比「自动删网页会话」更干净，还省掉那次删除请求。只登录态有意义；开了「服务端多轮续接」时不生效（临时对话不留列表，多轮要靠服务端留会话）':
     'Uses web-native "Temporary Chat" (inner[45]=1): conversations never enter account history and are not used for training. Cleaner than auto-delete and eliminates the delete request. Effective only when logged in; inactive if "Server multi-turn resume" is enabled (temporary chat leaves no history, multi-turn requires server sessions)',
+  '生图限流 · 全局': 'Image generation limits (global)',
+  '生图并发上限': 'Max concurrent image generations',
+  '所有生图接口共享的并发上限，默认 1，0=不限': 'Global concurrent image requests, including download. Default 1; 0 = unlimited.',
+  '每分钟生图上限': 'Image generations per minute',
+  '滚动 60 秒窗口内的生图尝试次数，默认 3，0=不限': 'Generation attempts in a rolling 60-second window. Default 3; 0 = unlimited.',
+  '每小时生图上限': 'Image generations per hour',
+  '滚动 1 小时窗口内的生图尝试次数，默认 30，0=不限': 'Generation attempts in a rolling one-hour window. Default 30; 0 = unlimited.',
+  '生图最小间隔（秒）': 'Minimum image interval (seconds)',
+  '相邻生图尝试开始之间的最小间隔，默认 20 秒，0=关闭': 'Minimum time between image generation attempts. Default 20 seconds; 0 = disabled.',
+  '生图 429 冷却（秒）': 'Image cooldown after HTTP 429 (seconds)',
+  '上游返回 HTTP 429 后暂停所有生图，默认 300 秒，0=关闭冷却；不立即重试': 'Pause image generation after an upstream generation HTTP 429. Default 300 seconds; 0 = no cooldown. No immediate retry.',
   '生图使用临时对话': 'Temporary chat for images',
   '独立生图请求使用网页原生临时对话，即使服务端多轮续接已开启。默认开。关闭后仍遵循全局临时对话设置。':
     'Uses native Temporary Chat for standalone image generation, even when server-side multi-turn is enabled. On by default. When off, the global Temporary chat setting still applies.',

@@ -28,6 +28,29 @@ The image bytes are fetched before returning the result. Temporary requests
 skip the separate auto-delete operation. Upstream image retrieval still
 depends on Gemini accepting the request and exposing the image download.
 
+## Image generation rate limits
+
+All explicit image generation requests share these instance-wide defaults:
+
+```json
+{
+  "image_max_concurrent": 1,
+  "image_rpm": 3,
+  "image_rph": 30,
+  "image_min_interval_sec": 20,
+  "image_cooldown_on_429_sec": 300
+}
+```
+
+Change them under **Image generation limits (global)** in the admin runtime
+settings, or in config.json. Zero disables each corresponding restriction.
+Limits count upstream generation attempts, including retries, in rolling
+windows. Excess requests receive HTTP 429, error code
+`image_rate_limit_exceeded`, and a Retry-After header. A generation response
+with upstream HTTP 429 stops retries and activates the configured cooldown.
+These counters are shared across accounts and proxies in this server process
+and reset when the process restarts. They do not restrict text, music or video.
+
 Compatibility:
 - `model`: `gemini-image` (recommended), plus client compatibility aliases
   `gpt-image-1`, `gpt-image-1-mini`, `dall-e-3` (all use Gemini).

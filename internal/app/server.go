@@ -330,12 +330,17 @@ func handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		mde, downgraded := err.(*ModelDowngradedError)
 		status := 502
-		if downgraded {
+		var imageLimit *ImageRateLimitError
+		if downgraded || errors.As(err, &imageLimit) {
 			status = 429
 		}
 		recordRequest("chat.completions", modelName, prompt, "", res, status, err.Error(), stream)
 		if sse != nil && sse.Started() {
 			sse.Fail(err) // 已经开流，HTTP 状态码改不了了
+			return
+		}
+		if imageLimit != nil {
+			writeImageRateLimitError(w, imageLimit)
 			return
 		}
 		if downgraded {
@@ -632,7 +637,8 @@ func handleResponses(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		mde, downgraded := err.(*ModelDowngradedError)
 		status := 502
-		if downgraded {
+		var imageLimit *ImageRateLimitError
+		if downgraded || errors.As(err, &imageLimit) {
 			status = 429
 		}
 		recordRequest("responses", modelName, prompt, "", res, status, err.Error(), stream)
@@ -640,6 +646,8 @@ func handleResponses(w http.ResponseWriter, r *http.Request) {
 			errObj := map[string]string{"message": err.Error()}
 			if downgraded {
 				errObj["code"] = "model_downgraded"
+			} else if imageLimit != nil {
+				errObj["code"] = "image_rate_limit_exceeded"
 			}
 			writeEvent("response.failed", map[string]interface{}{
 				"type": "response.failed",
@@ -651,6 +659,10 @@ func handleResponses(w http.ResponseWriter, r *http.Request) {
 					"error":  errObj,
 				},
 			})
+			return
+		}
+		if imageLimit != nil {
+			writeImageRateLimitError(w, imageLimit)
 			return
 		}
 		if downgraded {

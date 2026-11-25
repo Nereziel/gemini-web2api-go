@@ -58,6 +58,12 @@ type Config struct {
 	// Use native Temporary Chat for standalone image generation, independent
 	// of the global temporary_chat and multi_turn settings. On by default.
 	ImageTemporaryChat bool `json:"image_temporary_chat"`
+	// Global image generation safeguards; 0 disables the respective limit.
+	ImageMaxConcurrent    int `json:"image_max_concurrent"`
+	ImageRPM              int `json:"image_rpm"`
+	ImageRPH              int `json:"image_rph"`
+	ImageMinIntervalSec   int `json:"image_min_interval_sec"`
+	ImageCooldownOn429Sec int `json:"image_cooldown_on_429_sec"`
 	// 生成图放大（#62）：出图后照网页「下载原图」那样发 rpc c8o8Fe，返回放大版（实测宽高各
 	// 2 倍、JPEG）。要登录态；放大失败退回原来那张，不重新生成。默认 false。
 	ImageUpscale bool `json:"image_upscale"`
@@ -124,6 +130,11 @@ func defaultConfig() Config {
 		AnonFirst:              false,
 		TemporaryChat:          false,
 		ImageTemporaryChat:     true,
+		ImageMaxConcurrent:    1,
+		ImageRPM:              3,
+		ImageRPH:              30,
+		ImageMinIntervalSec:   20,
+		ImageCooldownOn429Sec: 300,
 		ImageUpscale:           false,
 		WebChannel:             false,
 		FirefoxFingerprint:     false,
@@ -149,5 +160,8 @@ func loadConfig(path string) error {
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(data, &cfg)
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return err
+	}
+	return validateImageRateLimits(cfg.ImageMaxConcurrent, cfg.ImageRPM, cfg.ImageRPH, cfg.ImageMinIntervalSec, cfg.ImageCooldownOn429Sec)
 }

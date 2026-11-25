@@ -30,7 +30,7 @@ func TestTemporaryChatEligible(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			rt := RuntimeConfig{TemporaryChat: c.temp, MultiTurn: c.multi, ImageTemporaryChat: c.image}
-			if got := temporaryChatEligible(rt, ModelConfig{Tool: c.tool}, c.auth); got != c.want {
+			if got := temporaryChatEligibleForModel(rt, ModelConfig{Tool: c.tool}, c.auth); got != c.want {
 				t.Errorf("temporary chat = %v, want %v", got, c.want)
 			}
 		})
@@ -52,13 +52,13 @@ func TestImageTemporaryChatDefaultAndExistingConfig(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"multi_turn":true}`), &rt); err != nil {
 		t.Fatal(err)
 	}
-	if !temporaryChatEligible(rt, ModelConfig{Tool: toolImage}, true) {
+	if !temporaryChatEligibleForModel(rt, ModelConfig{Tool: toolImage}, true) {
 		t.Fatal("saved runtime config without new field must retain image temporary chat")
 	}
 	if err := json.Unmarshal([]byte(`{"image_temporary_chat":false}`), &rt); err != nil {
 		t.Fatal(err)
 	}
-	if temporaryChatEligible(rt, ModelConfig{Tool: toolImage}, true) {
+	if temporaryChatEligibleForModel(rt, ModelConfig{Tool: toolImage}, true) {
 		t.Fatal("explicitly disabling image temporary chat must be respected")
 	}
 }

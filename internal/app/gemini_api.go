@@ -286,6 +286,9 @@ func writeGeminiCallError(w http.ResponseWriter, err error) {
 		writeGeminiError(w, 429, e.Error())
 	case *PromptTooLongError:
 		writeGeminiError(w, 400, e.Error())
+	case *ImageRateLimitError:
+		e.setRetryAfter(w)
+		writeGeminiError(w, 429, e.Error())
 	case *RateLimitError:
 		writeGeminiError(w, 429, e.Error())
 	default:
@@ -537,7 +540,8 @@ func handleGenerateContent(w http.ResponseWriter, r *http.Request, model string)
 	text, calls, res, err := runGeminiCall(g, nil, nil)
 	if err != nil {
 		status := 502
-		if _, ok := err.(*ModelDowngradedError); ok {
+		switch err.(type) {
+		case *ModelDowngradedError, *ImageRateLimitError:
 			status = 429
 		}
 		recordRequest("gemini.generateContent", g.modelName, g.prompt, "", res, status, err.Error(), false)
@@ -682,7 +686,8 @@ func handleStreamGenerateContent(w http.ResponseWriter, r *http.Request, model s
 	ka.Stop() // 之后的收尾回到单 goroutine 写；Started() 也要在保活停下后再看
 	if err != nil {
 		status := 502
-		if _, ok := err.(*ModelDowngradedError); ok {
+		switch err.(type) {
+		case *ModelDowngradedError, *ImageRateLimitError:
 			status = 429
 		}
 		recordRequest("gemini.streamGenerateContent", g.modelName, g.prompt, "", res, status, err.Error(), true)

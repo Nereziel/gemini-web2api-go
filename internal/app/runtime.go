@@ -66,6 +66,12 @@ type RuntimeConfig struct {
 	TemporaryChat bool `json:"temporary_chat"`
 	// Native Temporary Chat for standalone image generation. On by default.
 	ImageTemporaryChat bool `json:"image_temporary_chat"`
+	// Global image generation safeguards; 0 disables the respective limit.
+	ImageMaxConcurrent    int `json:"image_max_concurrent"`
+	ImageRPM              int `json:"image_rpm"`
+	ImageRPH              int `json:"image_rph"`
+	ImageMinIntervalSec   int `json:"image_min_interval_sec"`
+	ImageCooldownOn429Sec int `json:"image_cooldown_on_429_sec"`
 	// 生成图放大（#62）：出图后发 rpc c8o8Fe 取网页「下载原图」那张放大版。要登录态；
 	// 失败退回原图、不重新生成。默认 false，见 image_upscale.go。
 	ImageUpscale bool `json:"image_upscale"`
@@ -128,6 +134,11 @@ func initRuntimeConfig() {
 		AnonFirst:              cfg.AnonFirst,
 		TemporaryChat:          cfg.TemporaryChat,
 		ImageTemporaryChat:     cfg.ImageTemporaryChat,
+		ImageMaxConcurrent:    cfg.ImageMaxConcurrent,
+		ImageRPM:              cfg.ImageRPM,
+		ImageRPH:              cfg.ImageRPH,
+		ImageMinIntervalSec:   cfg.ImageMinIntervalSec,
+		ImageCooldownOn429Sec: cfg.ImageCooldownOn429Sec,
 		ImageUpscale:           cfg.ImageUpscale,
 		WebChannel:             cfg.WebChannel,
 		FirefoxFingerprint:     cfg.FirefoxFingerprint,
@@ -179,6 +190,9 @@ func replaceRetiredDefault(c *RuntimeConfig) {
 // 0 或负数会让限流器永远拒绝或永远放行，超大值能把单个请求挂死几小时。
 // 上界给得比任何合理用法都宽，只挡明显离谱的输入。
 func validateRuntimeConfig(c RuntimeConfig) error {
+	if err := validateImageRateLimits(c.ImageMaxConcurrent, c.ImageRPM, c.ImageRPH, c.ImageMinIntervalSec, c.ImageCooldownOn429Sec); err != nil {
+		return err
+	}
 	type rangeCheck struct {
 		name     string
 		v        int

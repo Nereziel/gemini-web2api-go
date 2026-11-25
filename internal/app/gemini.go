@@ -217,11 +217,11 @@ func anonFirstEligible(mc ModelConfig, hasAttachment bool) bool {
 	return rtCfg().AnonFirst && !hasAttachment && !modelNeedsLogin(mc)
 }
 
-// temporaryChatEligible selects Gemini's native Temporary Chat (inner[45]=1).
+// temporaryChatEligibleForModel selects Gemini's native Temporary Chat (inner[45]=1).
 // Image generation is a standalone media request, not a multi-turn session,
 // so it can use its own temporary-chat setting even when text multi-turn is on.
 // Other requests retain the upstream global setting and multi-turn restriction.
-func temporaryChatEligible(c RuntimeConfig, mc ModelConfig, signedIn bool) bool {
+func temporaryChatEligibleForModel(c RuntimeConfig, mc ModelConfig, signedIn bool) bool {
 	if !signedIn {
 		return false
 	}
@@ -229,6 +229,12 @@ func temporaryChatEligible(c RuntimeConfig, mc ModelConfig, signedIn bool) bool 
 		return true
 	}
 	return c.TemporaryChat && !c.MultiTurn
+}
+
+// temporaryChatEligible retains the global behavior for video continuation
+// and video quota accounting; the image-only setting must not affect them.
+func temporaryChatEligible() bool {
+	return temporaryChatEligibleForModel(rtCfg(), ModelConfig{}, true)
 }
 
 // availableModels 返回当前配置下值得暴露的模型。
@@ -447,6 +453,12 @@ type fileRef struct {
 // 匿名能把文件传上去，但对话里一引用就被服务端回 1100。
 func streamGenerateWithFiles(prompt, latest string, mc ModelConfig, pending []pendingUpload,
 	onDelta, onReasoning func(string)) (*StreamResult, error) {
+	if mc.Tool == toolImage {
+		if e := imageLimits.acquire(rtCfg(), time.Now()); e != nil {
+			return &StreamResult{}, e
+		}
+		defer imageLimits.release()
+	}
 	// strict_model 换号：被降级的号记冷却、本次排除，换下一个号重来。上限跟 XSRF 换号
 	// 一样是 maxCookieTries——连着几个号都降级，说明池子整体见底，不是撞上个别号。
 	exclude := map[int64]bool{}
@@ -736,7 +748,7 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 	inner[41] = []interface{}{1}
 	// Keep the actual request mode for cleanup, even if settings change while
 	// the image is being generated or downloaded.
-	useTemporaryChat := temporaryChatEligible(rtCfg(), mc, cookieStr != "")
+	useTemporaryChat := temporaryChatEligibleForModel(rtCfg(), mc, cookieStr != "")
 	if useTemporaryChat {
 		inner[45] = 1
 		if mc.Tool == toolImage {
@@ -867,6 +879,11 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 		Cookie: cookieStr, SAPISID: sapisid, AuthUser: authUser,
 	}
 	for attempt := 0; attempt < rtCfg().RetryAttempts; attempt++ {
+		if mc.Tool == toolImage {
+			if e := imageLimits.startAttempt(rtCfg(), time.Now()); e != nil {
+				return attrib(e)
+			}
+		}
 		var statusCode int
 		var raw []byte
 		var ttfb int64
@@ -883,6 +900,13 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 				cookieStr = merged
 				updateAccountCookie(cookieID, merged)
 			}
+		}
+		// Do not retry a rate-limited image generation, even if reading the
+		// upstream response body also failed. Respect the global cooldown.
+		if mc.Tool == toolImage && statusCode == http.StatusTooManyRequests {
+			e := imageLimits.upstream429(rtCfg(), time.Now())
+			logf("[image] %v", e)
+			return attrib(e)
 		}
 		// 降级不是出口或 cookie 的错，也不该重试：同一个号再发一次还是降级。
 		var mde *ModelDowngradedError

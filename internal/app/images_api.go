@@ -105,6 +105,12 @@ func handleImageGenerations(w http.ResponseWriter, r *http.Request) {
         }
     }
     if err != nil {
+        var imageLimit *ImageRateLimitError
+        if errors.As(err, &imageLimit) {
+            recordRequest("images.generations", modelName, req.Prompt, "", res, 429, err.Error(), false)
+            writeImageRateLimitError(w, imageLimit)
+            return
+        }
         status := 502
         var rateErr *RateLimitError
         var longErr *PromptTooLongError

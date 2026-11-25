@@ -17,5 +17,10 @@
   "cookie_file": "",
   "proxy": "",
   "log_requests": true,
-  "image_temporary_chat": true
+  "image_temporary_chat": true,
+  "image_max_concurrent": 1,
+  "image_rpm": 3,
+  "image_rph": 30,
+  "image_min_interval_sec": 20,
+  "image_cooldown_on_429_sec": 300
 }
