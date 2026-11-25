@@ -1,0 +1,43 @@
+name: Windows Server build (main)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'internal/app/admin_ui/**'
+      - '.github/workflows/windows-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test
+        run: go test ./...
+      - name: Compile Windows x64
+        env:
+          CGO_ENABLED: "0"
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags="-s -w" -o dist/gemini-web2api-go_windows_amd64.exe .
+          cd dist
+          sha256sum gemini-web2api-go_windows_amd64.exe > SHA256SUMS.txt
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-web2api-go-windows-amd64-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error

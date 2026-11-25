@@ -55,6 +55,9 @@ type Config struct {
 	// RPC）。只登录态有意义（匿名本就不落账号）。与 multi_turn 冲突：multi_turn 开着时不发，
 	// 见 temporaryChatEligible。默认 false。
 	TemporaryChat bool `json:"temporary_chat"`
+	// Use native Temporary Chat for standalone image generation, independent
+	// of the global temporary_chat and multi_turn settings. On by default.
+	ImageTemporaryChat bool `json:"image_temporary_chat"`
 	// 生成图放大（#62）：出图后照网页「下载原图」那样发 rpc c8o8Fe，返回放大版（实测宽高各
 	// 2 倍、JPEG）。要登录态；放大失败退回原来那张，不重新生成。默认 false。
 	ImageUpscale bool `json:"image_upscale"`
@@ -120,6 +123,7 @@ func defaultConfig() Config {
 		AutoDeleteConversation: false,
 		AnonFirst:              false,
 		TemporaryChat:          false,
+		ImageTemporaryChat:     true,
 		ImageUpscale:           false,
 		WebChannel:             false,
 		FirefoxFingerprint:     false,

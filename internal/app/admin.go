@@ -635,7 +635,8 @@ func handleAdminConfig(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 	case http.MethodPut:
-		var next RuntimeConfig
+		// Preserve the new image setting when an older client omits it.
+		next := RuntimeConfig{ImageTemporaryChat: rtCfg().ImageTemporaryChat}
 		if err := json.NewDecoder(r.Body).Decode(&next); err != nil {
 			writeJSON(w, 400, map[string]string{"error": "invalid JSON: " + err.Error()})
 			return

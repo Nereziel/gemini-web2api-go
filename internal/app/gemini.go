@@ -217,14 +217,18 @@ func anonFirstEligible(mc ModelConfig, hasAttachment bool) bool {
 	return rtCfg().AnonFirst && !hasAttachment && !modelNeedsLogin(mc)
 }
 
-// temporaryChatEligible 判断这次请求该不该走网页端原生「临时对话」（inner[45]=1，#34）。
-//
-// 与 multi_turn 冲突：临时对话不进会话列表，而 multi_turn 要按历史认出续接、靠服务端
-// 留着这串对话——两个一起开，续接那半就没了。所以 multi_turn 开着时一律不发 inner[45]，
-// 由 multi_turn 决定会话怎么留。调用点还会再要求有登录 cookie：匿名本来就不落账号，
-// 发 inner[45] 是没验过的无谓偏离。
-func temporaryChatEligible() bool {
-	return rtCfg().TemporaryChat && !rtCfg().MultiTurn
+// temporaryChatEligible selects Gemini's native Temporary Chat (inner[45]=1).
+// Image generation is a standalone media request, not a multi-turn session,
+// so it can use its own temporary-chat setting even when text multi-turn is on.
+// Other requests retain the upstream global setting and multi-turn restriction.
+func temporaryChatEligible(c RuntimeConfig, mc ModelConfig, signedIn bool) bool {
+	if !signedIn {
+		return false
+	}
+	if mc.Tool == toolImage && mc.Cont == nil && c.ImageTemporaryChat {
+		return true
+	}
+	return c.TemporaryChat && !c.MultiTurn
 }
 
 // availableModels 返回当前配置下值得暴露的模型。
@@ -730,11 +734,14 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 	// 我们原来写 [2]，是早期抄来的值、协议层已被证伪。含义仍未知，
 	// 匿名两个值都能通，但没有理由继续偏离浏览器。
 	inner[41] = []interface{}{1}
-	// 临时对话（#34）：inner[45]=1 让这条不进账号的会话列表、不入训练。只在有登录
-	// cookie 时发——匿名本就不落账号，发了也没意义且没验过。multi_turn 开着时
-	// temporaryChatEligible 直接为假（两者冲突，见那里）。
-	if temporaryChatEligible() && cookieStr != "" {
+	// Keep the actual request mode for cleanup, even if settings change while
+	// the image is being generated or downloaded.
+	useTemporaryChat := temporaryChatEligible(rtCfg(), mc, cookieStr != "")
+	if useTemporaryChat {
 		inner[45] = 1
+		if mc.Tool == toolImage {
+			logf("[image] using temporary chat")
+		}
 	}
 	inner[53] = 0
 	reqUUID := uuid.NewString()
@@ -1027,7 +1034,7 @@ func streamGenerateOnce(prompt, latest string, mc ModelConfig, pending []pending
 		//
 		// 临时对话（#34）生效时跳过：那条压根没进会话列表，删它是多发一次 RPC 删空气。
 		// 这正是临时对话比 create-then-delete 省的那一次出站请求。
-		if rtCfg().AutoDeleteConversation && !temporaryChatEligible() && cookieStr != "" && xsrfToken != "" {
+		if rtCfg().AutoDeleteConversation && !useTemporaryChat && cookieStr != "" && xsrfToken != "" {
 			if cid := extractConversationID(string(raw)); cid != "" {
 				go deleteConversation(cid, cookieStr, sapisid, xsrfToken, proxyURL, authUser)
 			}

@@ -64,6 +64,8 @@ type RuntimeConfig struct {
 	// 取代 auto_delete_conversation（省掉删除 RPC）。只登录态有意义，与 multi_turn 冲突
 	// （multi_turn 开着时不发）。默认 false，见 temporaryChatEligible。
 	TemporaryChat bool `json:"temporary_chat"`
+	// Native Temporary Chat for standalone image generation. On by default.
+	ImageTemporaryChat bool `json:"image_temporary_chat"`
 	// 生成图放大（#62）：出图后发 rpc c8o8Fe 取网页「下载原图」那张放大版。要登录态；
 	// 失败退回原图、不重新生成。默认 false，见 image_upscale.go。
 	ImageUpscale bool `json:"image_upscale"`
@@ -125,6 +127,7 @@ func initRuntimeConfig() {
 		AutoDeleteConversation: cfg.AutoDeleteConversation,
 		AnonFirst:              cfg.AnonFirst,
 		TemporaryChat:          cfg.TemporaryChat,
+		ImageTemporaryChat:     cfg.ImageTemporaryChat,
 		ImageUpscale:           cfg.ImageUpscale,
 		WebChannel:             cfg.WebChannel,
 		FirefoxFingerprint:     cfg.FirefoxFingerprint,

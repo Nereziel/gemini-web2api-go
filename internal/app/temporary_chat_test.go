@@ -1,28 +1,64 @@
 package app
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
-// temporaryChatEligible 的不变量：temporary_chat 开着才走临时对话，且 multi_turn 一律压制
-// （两者冲突——临时对话不进会话列表，多轮要靠服务端留会话，见 temporaryChatEligible 注释）。
 func TestTemporaryChatEligible(t *testing.T) {
-	old := rtCfg()
-	defer func() { rtMu.Lock(); rtVal = old; rtMu.Unlock() }()
-
 	cases := []struct {
-		temp, multi, want bool
+		name                     string
+		tool                     int
+		temp, multi, image, auth bool
+		want                     bool
 	}{
-		{false, false, false}, // 都关
-		{true, false, true},   // 只开临时 → 生效
-		{true, true, false},   // 临时+多轮 → 多轮压制
-		{false, true, false},  // 只开多轮
+		{"text all off", 0, false, false, false, true, false},
+		{"text global on", 0, true, false, false, true, true},
+		{"text multi-turn", 0, true, true, true, true, false},
+		{"text image setting only", 0, false, false, true, true, false},
+		{"anonymous global on", 0, true, false, true, false, false},
+		{"image default", toolImage, false, false, true, true, true},
+		{"image with multi-turn", toolImage, false, true, true, true, true},
+		{"image anonymous", toolImage, true, false, true, false, false},
+		{"image disabled", toolImage, false, false, false, true, false},
+		{"image global on", toolImage, true, false, false, true, true},
+		{"image global blocked by multi-turn", toolImage, true, true, false, true, false},
+		{"video unchanged", toolVideo, false, false, true, true, false},
+		{"music unchanged", toolMusic, false, false, true, true, false},
+		{"video global on", toolVideo, true, false, true, true, true},
 	}
 	for _, c := range cases {
-		rtMu.Lock()
-		rtVal.TemporaryChat = c.temp
-		rtVal.MultiTurn = c.multi
-		rtMu.Unlock()
-		if got := temporaryChatEligible(); got != c.want {
-			t.Errorf("temp=%v multi=%v => %v, 期望 %v", c.temp, c.multi, got, c.want)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			rt := RuntimeConfig{TemporaryChat: c.temp, MultiTurn: c.multi, ImageTemporaryChat: c.image}
+			if got := temporaryChatEligible(rt, ModelConfig{Tool: c.tool}, c.auth); got != c.want {
+				t.Errorf("temporary chat = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+func TestImageTemporaryChatDefaultAndExistingConfig(t *testing.T) {
+	c := defaultConfig()
+	if !c.ImageTemporaryChat {
+		t.Fatal("image temporary chat must default to enabled")
+	}
+	if err := json.Unmarshal([]byte(`{"multi_turn":true}`), &c); err != nil {
+		t.Fatal(err)
+	}
+	if !c.ImageTemporaryChat {
+		t.Fatal("existing config without new field must retain the default")
+	}
+	rt := RuntimeConfig{ImageTemporaryChat: c.ImageTemporaryChat}
+	if err := json.Unmarshal([]byte(`{"multi_turn":true}`), &rt); err != nil {
+		t.Fatal(err)
+	}
+	if !temporaryChatEligible(rt, ModelConfig{Tool: toolImage}, true) {
+		t.Fatal("saved runtime config without new field must retain image temporary chat")
+	}
+	if err := json.Unmarshal([]byte(`{"image_temporary_chat":false}`), &rt); err != nil {
+		t.Fatal(err)
+	}
+	if temporaryChatEligible(rt, ModelConfig{Tool: toolImage}, true) {
+		t.Fatal("explicitly disabling image temporary chat must be respected")
 	}
 }

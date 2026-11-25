@@ -1084,6 +1084,8 @@ const RT_GROUPS = [
         hint: '出完结果自动删掉 gemini.google.com 上留下的这条会话，免得登录号里堆一堆。只登录态生效，异步 best-effort，删失败不影响响应' },
       { k: 'temporary_chat', label: '临时对话', type: 'bool',
         hint: '走网页端原生「临时对话」（inner[45]=1）：会话压根不进账号的会话列表、不用于训练，比「自动删网页会话」更干净，还省掉那次删除请求。只登录态有意义；开了「服务端多轮续接」时不生效（临时对话不留列表，多轮要靠服务端留会话）' },
+      { k: 'image_temporary_chat', label: '生图使用临时对话', type: 'bool',
+        hint: '独立生图请求使用网页原生临时对话，即使服务端多轮续接已开启。默认开。关闭后仍遵循全局临时对话设置。' },
       { k: 'multi_turn', label: '服务端多轮续接', type: 'bool',
         hint: '按完整历史匹配会话，命中后复用原账号，只发送全部新增消息。支持 function calling 和多条工具结果；图片输入、媒体模型不生效。保持历史、模型和工具配置稳定。会话状态保存在内存，空闲 90 分钟或重启后重建。续接命中不代表 Google 模型缓存命中。默认关' },
       { k: 'image_upscale', label: '生图下载原图/放大', type: 'bool',
@@ -2622,6 +2624,9 @@ const I18N_EN = {
   '临时对话': 'Temporary chat',
   '走网页端原生「临时对话」（inner[45]=1）：会话压根不进账号的会话列表、不用于训练，比「自动删网页会话」更干净，还省掉那次删除请求。只登录态有意义；开了「服务端多轮续接」时不生效（临时对话不留列表，多轮要靠服务端留会话）':
     'Uses web-native "Temporary Chat" (inner[45]=1): conversations never enter account history and are not used for training. Cleaner than auto-delete and eliminates the delete request. Effective only when logged in; inactive if "Server multi-turn resume" is enabled (temporary chat leaves no history, multi-turn requires server sessions)',
+  '生图使用临时对话': 'Temporary chat for images',
+  '独立生图请求使用网页原生临时对话，即使服务端多轮续接已开启。默认开。关闭后仍遵循全局临时对话设置。':
+    'Uses native Temporary Chat for standalone image generation, even when server-side multi-turn is enabled. On by default. When off, the global Temporary chat setting still applies.',
   '服务端多轮续接': 'Server multi-turn resume',
   '按完整历史匹配会话，命中后复用原账号，只发送全部新增消息。支持 function calling 和多条工具结果；图片输入、媒体模型不生效。保持历史、模型和工具配置稳定。会话状态保存在内存，空闲 90 分钟或重启后重建。续接命中不代表 Google 模型缓存命中。默认关':
     'Matches sessions against full history, reuses the original account and sends all new messages. Supports function calling and batches of tool results; inactive with image input or media models. Keep history, model and tool configuration stable. State stays in memory and is rebuilt after 90 idle minutes or a restart. Session reuse does not indicate a Google model cache hit. Off by default',
